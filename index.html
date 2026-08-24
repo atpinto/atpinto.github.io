@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Statistical simulations for teaching — Armando Teixeira-Pinto</title>
-<meta name="description" content="Free, browser-based simulations for teaching biostatistics: backpropagation, MCMC samplers, multiple linear regression, randomisation in trials, and the central limit theorem.">
+<meta name="description" content="Free, browser-based simulations for teaching biostatistics: backpropagation, MCMC samplers, multiple linear regression, randomisation and sample size in trials, the central limit theorem, a Galton board and the Monty Hall problem.">
 <meta property="og:title" content="Statistical simulations for teaching">
-<meta property="og:description" content="Free, browser-based simulations for teaching biostatistics — backpropagation, MCMC, regression, randomisation, the central limit theorem.">
+<meta property="og:description" content="Free, browser-based simulations for teaching biostatistics — backpropagation, MCMC, regression, trial design, the central limit theorem, a Galton board and Monty Hall.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://atpinto.github.io/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -179,7 +179,7 @@
     <div>
       <p class="eyebrow">Armando Teixeira-Pinto · Sydney School of Public Health</p>
       <h1>Statistics you can <em>watch happen</em></h1>
-      <p class="lede">Nine simulations I built for teaching biostatistics. Each one runs in the browser, needs no software or account, and lets you change the thing that matters and see the consequence immediately.</p>
+      <p class="lede">Eleven simulations I built for teaching biostatistics. Each one runs in the browser, needs no software or account, and lets you change the thing that matters and see the consequence immediately.</p>
       <p class="lede-note">Free to use in your own teaching. Throughout, blue is the model and pink is the data.</p>
     </div>
 
@@ -445,10 +445,70 @@
           </div>
         </a>
       </li>
+
+      <li>
+        <a class="entry" href="https://atpinto.github.io/galton/">
+          <svg class="glyph" viewBox="0 0 132 88" aria-hidden="true">
+            <g fill="var(--model)" fill-opacity=".6">
+              <circle cx="66" cy="14" r="1.8"/>
+              <circle cx="60" cy="25" r="1.8"/><circle cx="72" cy="25" r="1.8"/>
+              <circle cx="54" cy="36" r="1.8"/><circle cx="66" cy="36" r="1.8"/><circle cx="78" cy="36" r="1.8"/>
+              <circle cx="48" cy="47" r="1.8"/><circle cx="60" cy="47" r="1.8"/><circle cx="72" cy="47" r="1.8"/><circle cx="84" cy="47" r="1.8"/>
+            </g>
+            <polyline class="draw" pathLength="1" fill="none" stroke="var(--sample)" stroke-width="1.3"
+              stroke-linejoin="round" stroke-linecap="round"
+              points="66,6 63,20 69,31 63,42 57,54 54,63"/>
+            <g class="pop" fill="var(--sample)" fill-opacity=".28">
+              <rect x="37" y="73" width="10" height="3"/>
+              <rect x="49" y="66" width="10" height="10"/>
+              <rect x="61" y="61" width="10" height="15"/>
+              <rect x="73" y="66" width="10" height="10"/>
+              <rect x="85" y="73" width="10" height="3"/>
+            </g>
+            <line x1="34" y1="76" x2="98" y2="76" stroke="var(--rule)" stroke-width="1"/>
+          </svg>
+          <div>
+            <h3>The Galton board</h3>
+            <p class="hook">Every ball takes nine independent coin flips on its way down, and the bell shape appears without anyone drawing it.</p>
+            <p class="detail">A physical simulation of a nine-row pin board. Release a single ball and follow its path, or open the hopper and let a stream run until the bins fill. The heights that build up are the binomial distribution one ball at a time.</p>
+          </div>
+        </a>
+      </li>
     </ul>
   </section>
 
-  
+  <!-- ============ GROUP: probability ============ -->
+  <section class="group">
+    <div class="group-head"><span class="group-n">06</span><h2>Probability</h2></div>
+    <ul class="index">
+      <li>
+        <a class="entry" href="https://atpinto.github.io/MontyHall/">
+          <svg class="glyph" viewBox="0 0 132 88" aria-hidden="true">
+            <g fill="none" stroke="var(--model)" stroke-width="1.3">
+              <rect class="draw" pathLength="1" x="16" y="20" width="28" height="50"/>
+              <rect class="draw" pathLength="1" x="52" y="20" width="28" height="50"/>
+              <rect class="draw" pathLength="1" x="88" y="20" width="28" height="50"/>
+            </g>
+            <g fill="var(--model)" fill-opacity=".6">
+              <circle cx="39" cy="47" r="1.7"/><circle cx="75" cy="47" r="1.7"/><circle cx="111" cy="47" r="1.7"/>
+            </g>
+            <g class="pop" fill="none" stroke="var(--sample)" stroke-width="1.4" stroke-linecap="round">
+              <line x1="60" y1="38" x2="72" y2="52"/>
+              <line x1="72" y1="38" x2="60" y2="52"/>
+              <path d="M30 16 C 52 2, 92 2, 108 14"/>
+            </g>
+            <path class="pop" d="M108 14 l 0 -7 l -6 4 z" fill="var(--sample)"/>
+          </svg>
+          <div>
+            <h3>The Monty Hall problem</h3>
+            <p class="hook">Play a few rounds on instinct, then run ten thousand and watch the two strategies settle on 1/3 and 2/3.</p>
+            <p class="detail">Pick a door, watch the host open a goat, then stay or switch. A running tally keeps the win rate of each strategy separately and plots both against the 1/3 and 2/3 lines as rounds accumulate. Batches of 100, 1,000 or 10,000 rounds can be simulated under always-stay, always-switch, or both at once.</p>
+          </div>
+        </a>
+      </li>
+    </ul>
+  </section>
+
 
   <!-- ============ REUSE ============ -->
   <section class="reuse">
