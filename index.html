@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Statistical simulations for teaching — Armando Teixeira-Pinto</title>
-  <meta name="description" content="Free, browser-based simulations for teaching biostatistics: backpropagation, MCMC, regression, trial design, the central limit theorem, hypothesis tests, ROC curves, a Galton board and the Monty Hall problem." />
+  <meta name="description" content="Free, browser-based simulations for teaching biostatistics: Kaplan–Meier survival curves, backpropagation, MCMC, regression, trial design, the central limit theorem, hypothesis tests, ROC curves, a Galton board and the Monty Hall problem." />
   <meta name="theme-color" content="#F0E8D8" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23F0E8D8'/%3E%3Cellipse cx='16' cy='17' rx='11' ry='7' fill='none' stroke='%231A6B78' stroke-width='2'/%3E%3Cpath d='M7 21 L13 12 L18 18 L25 10' fill='none' stroke='%23C94B3A' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='7' cy='21' r='1.8' fill='%23C94B3A'/%3E%3Ccircle cx='25' cy='10' r='2' fill='%23C94B3A'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -191,6 +191,27 @@
       font-size: .85rem; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 50;
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    /* A quiet navigation strip reserves space, so it never covers a simulation. */
+    #simulation-view[hidden] { display: none; }
+    body.viewing-simulation { overflow: hidden; }
+    #simulation-view {
+      position: fixed; inset: 0; height: 100vh; height: 100dvh;
+      display: grid; grid-template-rows: auto minmax(0, 1fr);
+      background: #fff; z-index: 100;
+    }
+    .simulation-nav {
+      display: flex; align-items: center; min-height: 2rem;
+      padding: env(safe-area-inset-top, 0px) max(.5rem, env(safe-area-inset-right, 0px)) 0 max(.5rem, env(safe-area-inset-left, 0px));
+      background: #f8f8f7; border-bottom: 1px solid #e5e5e3;
+    }
+    .simulation-nav a {
+      display: inline-flex; align-items: center; min-height: 2rem;
+      padding: 0 .5rem; font: 400 .875rem/1.4 var(--sans); color: #62625d;
+    }
+    .simulation-nav a:hover { color: #252521; background: #eeeee9; }
+    .simulation-nav a:focus-visible { outline: 2px solid var(--model); outline-offset: -2px; }
+    #simulation-frame { display: block; width: 100%; height: 100%; min-height: 0; border: 0; }
+    @media (pointer: coarse) { .simulation-nav a { min-height: 2.75rem; } }
     @media (min-width: 640px) {
       .bar, .wrap, .hero, footer.site { padding-left: 1.75rem; padding-right: 1.75rem; }
       .legend { display: flex; }
@@ -209,6 +230,13 @@
   </style>
 </head>
 <body>
+  <section id="simulation-view" aria-label="Simulation viewer" hidden>
+    <nav class="simulation-nav" aria-label="Simulation navigation">
+      <a id="simulation-back" href="#catalog">← All simulations</a>
+    </nav>
+    <iframe id="simulation-frame" title="Simulation" allow="fullscreen" allowfullscreen></iframe>
+  </section>
+  <div id="simulation-menu">
   <a class="skip" href="#nn">Skip to simulations</a>
   <header class="site">
     <div class="brand-bar"></div>
@@ -234,11 +262,11 @@
       <div>
         <p class="kicker">Armando Teixeira-Pinto · Sydney School of Public Health</p>
         <h1>Statistics you can <em>watch happen</em></h1>
-        <p class="lede">13 simulations I built for teaching biostatistics. Each one runs in the browser, needs no software or account, and lets you change the thing that matters and see the consequence immediately.</p>
+        <p class="lede">14 simulations I built for teaching biostatistics. Each one runs in the browser, needs no software or account, and lets you change the thing that matters and see the consequence immediately.</p>
         <p class="note">Free to use in your own teaching. Throughout, <span class="model">teal is the model</span> and <span class="sample">coral is the data</span>.</p>
         <div class="actions">
           <a class="btn primary" href="#nn">
-            Browse all 13
+            Browse all 14
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
           </a>
           <a class="btn ghost" href="#teaching">Use in a course</a>
@@ -299,6 +327,7 @@
     </p>
   </footer>
   <div id="toast" role="status"></div>
+  </div>
 
   <script>
 (function () {
@@ -311,8 +340,10 @@
     { id: "prob", n: "06", title: "Probability", nav: "Probability" },
     { id: "infer", n: "07", title: "Hypothesis tests", nav: "Inference" },
     { id: "diag", n: "08", title: "Diagnostic tests", nav: "Diagnostics" },
+    { id: "survival", n: "09", title: "Survival analysis", nav: "Survival" },
   ];
   const SIMS = [
+    { id: "km", group: "survival", href: "https://atpinto.github.io/KM/", title: "Kaplan–Meier, a step at a time", hook: "Follow 21 patients and build the survival curve one event at a time.", detail: "Step through patient follow-up, the risk set and the life table together. See how events lower the survival estimate, how censoring changes later risk sets, and how each conditional probability contributes to the Kaplan–Meier curve. Play automatically or move forward and backward one time point at a time." },
     { id: "nn", group: "nn", href: "https://atpinto.github.io/nn", title: "Backpropagation, one step at a time", hook: "Advance a single training pass phase by phase and see every formula with the numbers filled in.", detail: "A minimal two-neuron sigmoid network trained on one or two data points. Each of the six phases — two forward, loss, two backward, update — is advanced individually. Toggles for a second input, a second sample, SGD versus batch updating, and the learning rate." },
     { id: "mcmc", group: "bayes", href: "https://atpinto.github.io/MCMC/index.html", title: "Metropolis–Hastings, Gibbs and HMC side by side", hook: "Watch three samplers explore the same bivariate normal and see where each one struggles.", detail: "An animated dashboard showing the chain's path in the joint space alongside the two marginal distributions as they build up. Adjustable number of draws, animation speed, and HMC leapfrog steps and step size." },
     { id: "nlin", group: "reg", href: "https://atpinto.github.io/MultipleLinearRegression/nonlineareffects.html", title: "Non-linear effects in a linear model", hook: "Fit a curved BMI–blood pressure association without leaving the linear model framework.", detail: "Switch between polynomials, fractional polynomials, linear splines and restricted cubic splines; vary the degree, the powers and the number of knots; compare the fitted curves and R²." },
@@ -341,6 +372,8 @@
     return '<iframe src="' + href + '"\n        width="100%" height="640"\n        style="border:1px solid #ccc"></iframe>';
   }
 
+  function viewerHref(sim) { return "#simulation=" + encodeURIComponent(sim.id); }
+
   const navHtml = GROUPS.map((g) => '<a href="#' + g.id + '">' + esc(g.nav) + "</a>").join("");
   document.querySelector("nav.topics").innerHTML = navHtml;
   document.querySelector("nav.mobile").innerHTML = navHtml;
@@ -355,15 +388,15 @@
       '<div class="group-head"><span class="n">' + group.n + "</span><h2>" + esc(group.title) + "</h2></div>" +
       items.map((sim) =>
         '<article class="card" data-id="' + sim.id + '">' +
-          '<a class="thumb" href="' + esc(sim.href) + '" target="_blank" rel="noreferrer" aria-label="' + esc(sim.title) + ' (opens in a new tab)">' +
+          '<a class="thumb" href="' + viewerHref(sim) + '" aria-label="' + esc(sim.title) + '">' +
             '<div class="stage"><canvas data-sim="' + sim.id + '" data-kind="card" aria-label="' + esc(sim.title) + '"></canvas></div>' +
           "</a>" +
           "<div>" +
-            "<h3><a href=\"" + esc(sim.href) + "\" target=\"_blank\" rel=\"noreferrer\">" + esc(sim.title) + "</a></h3>" +
+            "<h3><a href=\"" + viewerHref(sim) + "\">" + esc(sim.title) + "</a></h3>" +
             '<p class="hook">' + esc(sim.hook) + "</p>" +
             '<p class="detail">' + esc(sim.detail) + "</p>" +
             '<div class="row">' +
-              '<a class="btn link" href="' + esc(sim.href) + '" target="_blank" rel="noreferrer">Open simulation <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></a>' +
+              '<a class="btn link" href="' + viewerHref(sim) + '">Open simulation <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></a>' +
               '<button class="btn quiet copy-embed" type="button" data-href="' + esc(sim.href) + '">Copy embed</button>' +
             "</div>" +
           "</div>" +
@@ -371,6 +404,54 @@
       ).join("");
     catalog.appendChild(sec);
   });
+
+  const menu = document.getElementById("simulation-menu");
+  const viewer = document.getElementById("simulation-view");
+  const frame = document.getElementById("simulation-frame");
+  const back = document.getElementById("simulation-back");
+  const menuTitle = document.title;
+  let menuScroll = null, menuFocus = null;
+
+  function syncViewer() {
+    // Only catalogue entries can be framed; URL parameters cannot inject a source.
+    const sim = SIMS.find((s) => location.hash === viewerHref(s));
+    if (sim) {
+      if (viewer.hidden) {
+        menuScroll = window.scrollY;
+        menuFocus = document.activeElement;
+      }
+      back.href = "#" + sim.group;
+      frame.title = sim.title;
+      if (frame.getAttribute("src") !== sim.href) frame.src = sim.href;
+      menu.hidden = true;
+      viewer.hidden = false;
+      document.body.classList.add("viewing-simulation");
+      document.title = sim.title + " — Statistical simulations";
+      back.focus({ preventScroll: true });
+    } else if (!viewer.hidden) {
+      viewer.hidden = true;
+      menu.hidden = false;
+      document.body.classList.remove("viewing-simulation");
+      // Unload the simulation so playback stops when returning to the menu.
+      frame.removeAttribute("src");
+      document.title = menuTitle;
+      const targetHash = location.hash;
+      requestAnimationFrame(() => {
+        if (!viewer.hidden || location.hash !== targetHash) return;
+        if (menuFocus && menuFocus.closest(".card")) {
+          window.scrollTo({ top: menuScroll, behavior: "instant" });
+          menuFocus.focus({ preventScroll: true });
+        } else {
+          const group = document.getElementById(targetHash.slice(1)) || catalog;
+          group.scrollIntoView({ behavior: "instant" });
+          const link = group.querySelector("a");
+          if (link) link.focus({ preventScroll: true });
+        }
+      });
+    }
+  }
+  window.addEventListener("hashchange", syncViewer);
+  syncViewer();
 
   const select = document.getElementById("sim-select");
   SIMS.forEach((s) => {
@@ -936,10 +1017,52 @@
     };
   }
 
+  function makeKm() {
+    const observations = [6, 6, 6, 7, 10, 13, 16, 22, 23,
+      6, 9, 10, 11, 17, 19, 20, 25, 32, 32, 34, 35];
+    const times = [...new Set(observations)].sort((a, b) => a - b);
+    let survival = 1, t = 0;
+    const steps = times.map((time) => {
+      const risk = observations.filter((v) => v >= time).length;
+      const events = observations.slice(0, 9).filter((v) => v === time).length;
+      survival *= 1 - events / risk;
+      return { time, survival, censored: observations.slice(9).includes(time) };
+    });
+    return {
+      reset: function () { t = times.length; },
+      tick: function (dt, intensity) { t += dt * 1.2 * intensity; },
+      draw: function (ctx, p, w, h) {
+        clear(ctx, p, w, h);
+        const x = (v) => 24 + v / 35 * (w - 38);
+        const y = (v) => 16 + (1 - v) * (h - 40);
+        ctx.strokeStyle = p.rule; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x(0), y(1)); ctx.lineTo(x(0), y(0)); ctx.lineTo(x(35), y(0)); ctx.stroke();
+        const count = Math.min(steps.length, Math.floor(t % (steps.length + 5)) + 1);
+        ctx.strokeStyle = p.model; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x(0), y(1));
+        let previous = 1;
+        steps.slice(0, count).forEach((step) => {
+          ctx.lineTo(x(step.time), y(previous));
+          ctx.lineTo(x(step.time), y(step.survival));
+          previous = step.survival;
+        });
+        ctx.stroke();
+        ctx.strokeStyle = p.sample; ctx.lineWidth = 1.5;
+        steps.slice(0, count).filter((step) => step.censored).forEach((step) => {
+          ctx.beginPath(); ctx.moveTo(x(step.time), y(step.survival) - 4);
+          ctx.lineTo(x(step.time), y(step.survival) + 4); ctx.stroke();
+        });
+        ctx.fillStyle = p.muted; ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+        ctx.fillText("1", 10, y(1) + 4); ctx.fillText("0", 10, y(0) + 4);
+        ctx.fillText("0", x(0) - 3, h - 8); ctx.fillText("35 weeks", Math.max(40, w - 72), h - 8);
+      },
+    };
+  }
+
   const factories = {
     nn: makeNN, mcmc: makeMh("card"), nlin: makeNlin, corr: makeCorr, contbin: makeContBin,
     dummy: makeDummy, rand: makeRand, power: makePower, clt: makeClt, galton: makeGalton,
-    monty: makeMonty, ht: makeHt, roc: makeRoc,
+    monty: makeMonty, ht: makeHt, roc: makeRoc, km: makeKm,
   };
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
