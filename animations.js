@@ -571,10 +571,39 @@
     };
   }
 
+  function makeLmm() {
+    const rand = mulberry32(31);
+    const pats = Array.from({ length: 7 }, function () {
+      const z = randn(rand);
+      return { u0: z * 0.15, u1: (0.5 * z + 0.87 * randn(rand)) * 0.2, ts: [0.05, 0.3, 0.55, 0.8, 0.95].filter(function () { return rand() > 0.25; }), e: [randn(rand), randn(rand), randn(rand), randn(rand), randn(rand)] };
+    });
+    let t = 0;
+    return {
+      reset: function () { t = 0; },
+      tick: function (dt, intensity) { t += dt * 0.45 * intensity; },
+      draw: function (ctx, p, w, h) {
+        clear(ctx, p, w, h);
+        const s = 0.5 - 0.5 * Math.cos(t);
+        const x = function (u) { return 18 + u * (w - 36); };
+        const y = function (v) { return 14 + v * (h - 28); };
+        const mean = function (u) { return 0.32 + 0.3 * u; };
+        pats.forEach(function (pt) {
+          const line = function (u) { return mean(u) + pt.u0 + s * pt.u1 * (u - 0.5) * 2; };
+          ctx.strokeStyle = hexAlpha(p.sample, 0.55); ctx.lineWidth = 1.3;
+          ctx.beginPath(); ctx.moveTo(x(0), y(line(0))); ctx.lineTo(x(1), y(line(1))); ctx.stroke();
+          ctx.fillStyle = p.sample;
+          pt.ts.forEach(function (u, k) { ctx.beginPath(); ctx.arc(x(u), y(line(u) + pt.e[k] * 0.025), 2.1, 0, Math.PI * 2); ctx.fill(); });
+        });
+        ctx.strokeStyle = p.model; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x(0), y(mean(0))); ctx.lineTo(x(1), y(mean(1))); ctx.stroke();
+      },
+    };
+  }
+
   const factories = {
     nn: makeNN, mcmc: makeMh("card"), nlin: makeNlin, corr: makeCorr, contbin: makeContBin,
     dummy: makeDummy, rand: makeRand, power: makePower, clt: makeClt, galton: makeGalton,
-    monty: makeMonty, ht: makeHt, roc: makeRoc, km: makeKm,
+    monty: makeMonty, ht: makeHt, roc: makeRoc, km: makeKm, lmm: makeLmm,
   };
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
