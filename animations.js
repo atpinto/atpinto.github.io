@@ -600,7 +600,28 @@
     };
   }
 
+  function makeHazard() {
+    let t = 0;
+    return {
+      reset: function () { t = 0; },
+      tick: function (dt, intensity) { t += dt * 0.22 * intensity; },
+      draw: function (ctx, p, w, h) {
+        clear(ctx, p, w, h);
+        const x = u => 23 + u * (w - 40), y = v => 14 + (1-v) * (h-35);
+        ctx.strokeStyle=p.rule; ctx.lineWidth=1; ctx.beginPath();
+        ctx.moveTo(x(0),y(1)); ctx.lineTo(x(0),y(0)); ctx.lineTo(x(1),y(0)); ctx.stroke();
+        const n=Math.floor(((t % 1.35)/1.35)*80);
+        [1, 1.8].forEach((hr,k)=>{
+          ctx.beginPath();
+          for(let i=0;i<=n;i++){const u=i/80, v=Math.exp(-hr*2*Math.pow(u,1.5));if(i===0)ctx.moveTo(x(u),y(v));else ctx.lineTo(x(u),y(v));}
+          ctx.strokeStyle=k?p.sample:p.model;ctx.lineWidth=2.5;ctx.setLineDash(k?[6,3]:[]);ctx.stroke();ctx.setLineDash([]);
+        });
+      }
+    };
+  }
+
   const factories = {
+    hazard: makeHazard,
     nn: makeNN, mcmc: makeMh("card"), nlin: makeNlin, corr: makeCorr, contbin: makeContBin,
     dummy: makeDummy, rand: makeRand, power: makePower, clt: makeClt, galton: makeGalton,
     monty: makeMonty, ht: makeHt, roc: makeRoc, km: makeKm, lmm: makeLmm,
