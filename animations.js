@@ -620,7 +620,27 @@
     };
   }
 
+  function makeCompeting() {
+    let t=0;
+    const curves = [
+      [[1, .125],[3, .30],[4, .5333]],
+      [[1, .125],[3, .25],[4, .375]]
+    ];
+    return {
+      reset: function () { t=0; },
+      tick: function (dt, intensity) { t+=dt*.18*intensity; },
+      draw: function (ctx,p,w,h) {
+        clear(ctx,p,w,h);
+        const x=u=>24+u/5*(w-41),y=v=>h-22-v/.6*(h-37);
+        ctx.strokeStyle=p.rule;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x(0),y(.6));ctx.lineTo(x(0),y(0));ctx.lineTo(x(5),y(0));ctx.stroke();
+        const now=Math.min(5,(t%1.35)/1.35*5);
+        curves.forEach((pts,k)=>{let prev=0;ctx.beginPath();ctx.moveTo(x(0),y(0));for(const [a,b] of pts){if(a>now)break;ctx.lineTo(x(a),y(prev));ctx.lineTo(x(a),y(b));prev=b}ctx.lineTo(x(now),y(prev));ctx.strokeStyle=k?p.model:p.sample;ctx.lineWidth=2.2;ctx.setLineDash(k?[]:[5,3]);ctx.stroke();ctx.setLineDash([])});
+      }
+    };
+  }
+
   const factories = {
+    competing: makeCompeting,
     hazard: makeHazard,
     nn: makeNN, mcmc: makeMh("card"), nlin: makeNlin, corr: makeCorr, contbin: makeContBin,
     dummy: makeDummy, rand: makeRand, power: makePower, clt: makeClt, galton: makeGalton,
