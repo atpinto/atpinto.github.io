@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="pageTitle">Kaplan–Meier &amp; RMST · a step at a time</title>
+<style>
+  :root { color-scheme: light; --ink:#172b3a; --muted:#536370; --blue:#075bb5; --pale:#eaf3ff; --line:#d7dfe5; --event:#bd3a22; --censor:#754c0b; --popup:#fff7e3; --popup-line:#dcc795; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#fff; color:var(--ink); font:20px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-variant-numeric:tabular-nums; }
+  main { max-width:1800px; margin:auto; padding:22px 30px 14px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:18px; }
+  h1 { font-size:32px; line-height:1.1; letter-spacing:-1px; margin:0; font-weight:650; }
+  .subtitle { color:var(--muted); font-size:18px; margin:6px 0 0; }
+  button { font:inherit; border:1px solid #a4b1bc; border-radius:6px; color:var(--ink); background:white; min-height:44px; padding:6px 15px; cursor:pointer; touch-action:manipulation; }
+  button:hover { background:#eef3f7; }
+  button:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+  button:disabled { opacity:.35; cursor:default; }
+  .primary { color:white; background:var(--blue); border-color:var(--blue); min-width:105px; }
+  .primary:hover { background:#084d95; }
+  .toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .transport { display:flex; gap:8px; flex-wrap:wrap; }
+  .time { font-size:25px; font-weight:600; white-space:nowrap; }
+  .step { color:var(--muted); font-size:18px; margin-left:14px; font-weight:400; }
+  .board { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,.95fr) minmax(530px,1.45fr); gap:26px; margin-top:20px; }
+  section { min-width:0; }
+  h2 { margin:0 0 6px; font-weight:600; font-size:23px; }
+  .panel-note { min-height:50px; font-size:18px; color:var(--muted); margin:0 0 6px; }
+  .panel-note strong { color:var(--blue); }
+  .chart { width:100%; min-height:var(--cohort-chart-height, 398px); height:398px; display:block; overflow:visible; }
+  .chart text { fill:var(--ink); font-family:inherit; font-size:18px; }
+  .chart .axis-label { font-size:19px; }
+  .chart .patient-label { font-size:19px; }
+  .chart .grid { stroke:#e4e9ed; stroke-width:1; }
+  .chart .axis { stroke:#a9b5be; stroke-width:1.3; }
+  .chart .guide { stroke:var(--blue); stroke-width:1.5; stroke-dasharray:5 5; }
+  .legend { display:flex; flex-wrap:wrap; gap:10px 16px; font-size:18px; min-height:28px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .event-key { color:var(--event); font-size:25px; line-height:1; font-weight:700; }
+  .censor-key { color:var(--censor); font-size:25px; line-height:1; font-weight:700; }
+  .risk-key { color:var(--blue); font-size:24px; line-height:1; }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; min-width:530px; border-collapse:collapse; font-size:22px; text-align:center; }
+  th { height:46px; font-size:18px; font-weight:500; line-height:1.1; color:var(--muted); text-align:center; padding:0 5px 8px; vertical-align:bottom; }
+  td { height:35px; border-top:1px solid #e7ebef; padding:0 5px; }
+  tbody tr { cursor:pointer; }
+  tbody tr:hover { background:#f3f6f9; }
+  tbody tr.selected { background:var(--pale); color:#064b95; font-weight:650; }
+  tbody tr.selected td:first-child { box-shadow:inset 4px 0 var(--blue); }
+  .row-button { min-height:35px; width:100%; padding:0 8px; text-align:center; border:0; background:transparent; color:inherit; font-weight:inherit; border-radius:0; }
+  .row-button:hover { background:transparent; }
+  .unrevealed { color:#727d87; font-weight:400; }
+  .table-note { font-size:18px; margin:9px 0 0; color:var(--muted); }
+  .table-section { position:relative; }
+  .calculation { position:absolute; right:0; z-index:5; width:min(100%,560px); padding:14px 18px; border:1px solid var(--popup-line); border-radius:8px; background:var(--popup); box-shadow:0 6px 24px #172b3a2e; pointer-events:none; transition:top .35s ease; }
+  .calculation::before { content:""; position:absolute; right:60px; width:14px; height:14px; background:var(--popup); border:1px solid var(--popup-line); transform:rotate(45deg); }
+  .calculation.below::before { top:-8px; border-right:0; border-bottom:0; }
+  .calculation.above::before { bottom:-8px; border-left:0; border-top:0; }
+  @media(prefers-reduced-motion:reduce) { .calculation{transition:none} }
+  .equation { font-size:26px; font-weight:500; line-height:1.35; display:flex; align-items:center; flex-wrap:wrap; gap:9px; }
+  .equation .answer { color:var(--blue); font-weight:650; }
+  .fraction { display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; font-size:.8em; line-height:1.08; margin:0 3px; }
+  .fraction span:first-child { border-bottom:2px solid currentColor; padding:0 6px 3px; }
+  .fraction span:last-child { padding-top:3px; }
+  .calc-note { font-size:18px; color:var(--muted); margin-top:4px; }
+  .risk-change { font-size:18px; color:var(--muted); margin-top:8px; padding-top:8px; border-top:1px solid var(--line); }
+  .risk-change strong { color:var(--ink); font-weight:650; }
+  footer { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-top:18px; color:var(--muted); font-size:16px; }
+  a { color:var(--blue); }
+  .keys { white-space:nowrap; }
+  .credit { margin:16px 0 0; color:var(--muted); font-size:16px; }
+  .credit a { font-weight:700; text-decoration-thickness:2px; text-underline-offset:3px; }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  @media(min-width:1500px) { body{font-size:22px} h1{font-size:36px} .chart{height:450px} td{height:40px} .row-button{min-height:40px} table{font-size:25px} th{font-size:20px} .equation{font-size:30px} }
+  @media(min-width:1180px) and (max-height:820px) { main{padding:12px 22px} header{margin-bottom:10px} h1{font-size:28px} .subtitle{font-size:16px;margin-top:3px} .toolbar{padding:8px 0} .board{margin-top:12px;gap:20px} .chart{height:336px} td{height:30px} .row-button{min-height:30px} th{height:36px} table{font-size:22px} .equation{font-size:24px} footer{margin-top:10px} }
+  @media(max-width:1179px) { .board{grid-template-columns:1fr 1fr} .follow-panel{grid-column:1/-1} .follow-panel .chart{height:360px} }
+  @media(max-width:700px) { main{padding:18px 16px} header{align-items:flex-start} h1{font-size:27px} #fullscreen{font-size:17px;padding:6px 9px} .toolbar{align-items:flex-start;flex-direction:column-reverse} .board{grid-template-columns:1fr;gap:25px} .follow-panel{grid-column:auto} .chart{height:355px} .equation{font-size:22px} footer{flex-direction:column} .step{margin-left:10px} }
+  @media print { main{padding:0} .toolbar,#fullscreen,.keys{display:none} .board{grid-template-columns:1fr 1fr 1fr;gap:14px} .follow-panel{grid-column:auto} .chart{height:350px!important} h1{font-size:25px} table{font-size:18px} th{font-size:15px} .equation{font-size:22px} }
+
+  .heading-help { display:block; width:100%; border:0; border-radius:0; padding:4px 0; background:transparent; color:inherit; font:inherit; text-align:inherit; text-decoration:underline dotted; text-underline-offset:4px; line-height:1.25; }
+  .heading-help:hover,.heading-help:focus-visible { color:var(--blue); background:var(--pale); }
+  .probability-heading { width:155px; }
+  .heading-formula { display:inline-block; margin-top:5px; font-weight:650; }
+  .column-tooltip { position:fixed; z-index:100; width:360px; max-width:calc(100vw - 24px); padding:16px 18px; border:1px solid var(--popup-line); border-radius:6px; background:var(--popup); color:var(--ink); box-shadow:0 6px 24px #172b3a26; font-size:20px; line-height:1.4; text-align:left; }
+  .column-tooltip[hidden] { display:none; }
+  .tooltip-formula { display:block; margin-top:9px; font-size:22px; font-weight:600; color:var(--blue); }
+  dialog { max-width:850px; width:calc(100% - 40px); max-height:85vh; border:1px solid var(--popup-line); border-radius:8px; padding:28px 32px; color:var(--ink); background:var(--popup); }
+  dialog::backdrop { background:#172b3a80; }
+  dialog h2 { font-size:28px; }
+  dialog p { font-size:22px; line-height:1.6; }
+  dialog form { display:flex; justify-content:flex-end; margin-top:24px; }
+  @media print { .column-tooltip,.heading-help + span,#problem-link,dialog{display:none} }
+  .header-actions { display:flex; align-items:center; gap:14px; }
+  .languages { display:flex; gap:4px; }
+  .lang { min-height:0; padding:5px; border-color:transparent; line-height:0; opacity:.5; }
+  .lang:hover { opacity:1; }
+  .lang[aria-pressed="true"] { opacity:1; border-color:#a4b1bc; }
+  .lang svg { width:30px; height:20px; border-radius:2px; box-shadow:0 0 0 1px #172b3a26; }
+  @media(max-width:700px) { .header-actions{flex-direction:column-reverse;align-items:flex-end;gap:8px} }
+  @media print { .languages{display:none} }
+
+  /* Display options: hide panels, shade the restricted mean survival time. */
+  :root { --rmst:#0d7a5f; --rmst-fill:#0d7a5f2e; }
+  .options { display:flex; align-items:center; flex-wrap:wrap; gap:10px 26px; padding:10px 0; border-bottom:1px solid var(--line); font-size:18px; }
+  .options label { display:inline-flex; align-items:center; gap:8px; cursor:pointer; min-height:36px; }
+  .options input[type=checkbox] { width:22px; height:22px; margin:0; accent-color:var(--blue); cursor:pointer; }
+  .options input:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+  .options .horizon { gap:10px; }
+  .options input[type=range] { width:180px; accent-color:var(--rmst); cursor:pointer; }
+  .options input[type=number] { font:inherit; width:4.2em; min-height:36px; padding:2px 6px; border:1px solid #a4b1bc; border-radius:6px; color:var(--ink); }
+  .options .disabled { opacity:.4; cursor:default; }
+  .options .disabled * { cursor:default; }
+  .rmst-key { display:inline-block; width:22px; height:16px; background:var(--rmst-fill); border:2px solid var(--rmst); border-radius:2px; }
+  .panel-note .rmst-value { color:var(--rmst); font-weight:650; }
+  .chart .rmst-label { fill:var(--rmst); font-weight:650; paint-order:stroke; stroke:#fff; stroke-width:5px; stroke-linejoin:round; }
+  .chart .rmst-guide { stroke:var(--rmst); stroke-width:2; stroke-dasharray:7 5; }
+  [hidden] { display:none !important; }
+  .board.hide-curve { grid-template-columns:minmax(0,1fr) minmax(530px,1.25fr); }
+  .board.hide-table { grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); }
+  .board.hide-curve.hide-table { grid-template-columns:minmax(0,1fr); max-width:1100px; }
+  @media(max-width:1179px) { .board.hide-curve,.board.hide-table { grid-template-columns:1fr; } .board.hide-curve section,.board.hide-table section { grid-column:auto; } }
+  @media print { .options{display:none} }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1 data-i18n="heading">Kaplan–Meier estimator</h1><p class="subtitle"><span data-i18n="subtitle">21 patients · time in weeks</span> · <a id="problem-link" href="#problem-description" data-i18n="problemLink">Problem description</a></p></div>
+    <div class="header-actions">
+      <div class="languages" role="group" aria-label="Language">
+        <button type="button" class="lang" data-lang="en" lang="en" aria-label="English" title="English"><svg viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><clipPath id="uk-cross"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><path d="M0 0h60v30H0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" clip-path="url(#uk-cross)" stroke="#c8102e" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></svg></button>
+        <button type="button" class="lang" data-lang="es" lang="es" aria-label="Español" title="Español"><svg viewBox="0 0 3 2" aria-hidden="true"><path d="M0 0h3v2H0z" fill="#aa151b"/><path d="M0 .5h3v1H0z" fill="#f1bf00"/></svg></button>
+        <button type="button" class="lang" data-lang="pt" lang="pt" aria-label="Português" title="Português"><svg viewBox="0 0 600 400" aria-hidden="true"><path d="M0 0h600v400H0z" fill="#da291c"/><path d="M0 0h240v400H0z" fill="#046a38"/><circle cx="240" cy="200" r="80" fill="none" stroke="#ffe900" stroke-width="18"/><path d="M205 150h70v60a35 35 0 0 1-70 0z" fill="#fff" stroke="#da291c" stroke-width="12"/></svg></button>
+      </div>
+      <button id="fullscreen" type="button">Full screen</button>
+    </div>
+  </header>
+  <nav class="toolbar" aria-label="Presentation controls" data-i18n-aria="controls">
+    <div class="transport">
+      <button id="restart" type="button" aria-label="Return to time zero" data-i18n="restart" data-i18n-aria="restartLabel">Restart</button>
+      <button id="previous" type="button" data-i18n="previous">← Previous</button>
+      <button id="play" class="primary" type="button" aria-pressed="false">Play</button>
+      <button id="next" type="button" data-i18n="next">Next →</button>
+    </div>
+    <div class="time" id="time-label">Week 0 <span class="step">1 / 17</span></div>
+  </nav>
+  <div class="options" role="group" aria-label="Display options" data-i18n-aria="optionsLabel">
+    <label><input type="checkbox" id="show-curve" checked> <span data-i18n="showCurve">Survival curve</span></label>
+    <label><input type="checkbox" id="show-table" checked> <span data-i18n="showTable">Life table</span></label>
+    <label id="rmst-toggle"><input type="checkbox" id="show-rmst"> <span class="rmst-key" aria-hidden="true"></span> <span data-i18n="showRmst">Show RMST</span></label>
+    <label class="horizon" id="horizon-control"><span data-i18n="horizon">Time horizon τ</span>
+      <input type="range" id="tau-range" min="1" max="35" step="1" value="30" aria-label="Time horizon in weeks" data-i18n-aria="horizonLabel">
+      <input type="number" id="tau" min="1" max="35" step="1" value="30" aria-label="Time horizon in weeks" data-i18n-aria="horizonLabel"> <span data-i18n="weeksUnit">weeks</span></label>
+  </div>
+  <div class="board">
+    <section class="follow-panel" aria-labelledby="follow-title">
+      <h2 id="follow-title" data-i18n="followTitle">Patient follow-up</h2>
+      <p class="panel-note" id="risk-label"></p>
+      <svg id="follow" class="chart" role="img" aria-label="Follow-up of 21 patients" data-i18n-aria="followLabel"></svg>
+      <div class="legend"><span><b class="event-key">×</b> <span data-i18n="death">Death</span></span><span><b class="censor-key">|</b> <span data-i18n="censored">Censored</span></span><span><b class="risk-key">●</b> <span data-i18n="atRisk">At risk</span></span></div>
+    </section>
+    <section class="curve-section" aria-labelledby="survival-title">
+      <h2 id="survival-title" data-i18n="survivalTitle">Survival curve</h2>
+      <p class="panel-note"><span id="survival-label"></span><span id="rmst-note"></span></p>
+      <svg id="survival" class="chart" role="img" aria-label="Kaplan–Meier survival estimate" data-i18n-aria="survivalLabel"></svg>
+      <div class="legend"><span><b class="censor-key">|</b> <span data-i18n="censored">Censored</span></span><span id="rmst-legend" hidden><span class="rmst-key" aria-hidden="true"></span> <span data-i18n="rmstLegend">RMST = area under the curve up to τ</span></span></div>
+      <p class="table-note" id="rmst-meaning" hidden></p>
+    </section>
+    <section class="table-section" aria-labelledby="table-title">
+      <h2 id="table-title" data-i18n="tableTitle">Life table</h2>
+      <p class="panel-note" data-i18n="tablePrompt">Select a time to reveal the curve.</p>
+      <div class="table-wrap">
+        <table aria-label="Kaplan–Meier life table" data-i18n-aria="tableLabel">
+          <thead><tr>
+            <th scope="col"><button class="heading-help" type="button" data-help="help-time" aria-describedby="help-time" data-i18n="colTime">Week<br>t</button></th>
+            <th scope="col"><button class="heading-help" type="button" data-help="help-risk" aria-describedby="help-risk" data-i18n="colRisk">At risk<br>n</button></th>
+            <th scope="col"><button class="heading-help" type="button" data-help="help-events" aria-describedby="help-events" data-i18n="colEvents">Deaths<br>d</button></th>
+            <th scope="col"><button class="heading-help" type="button" data-help="help-censored" aria-describedby="help-censored" data-i18n="colCensored">Cens.<br>c</button></th>
+            <th scope="col" class="probability-heading"><button class="heading-help" type="button" data-help="help-probability" aria-describedby="help-probability" data-i18n="colProbability">Prob of surviving<br><span class="heading-formula">1 − d/n</span></button></th>
+            <th scope="col"><button class="heading-help" type="button" data-help="help-survival" aria-describedby="help-survival" data-i18n="colSurvival">Survival<br>Ŝ(t)</button></th>
+          </tr></thead>
+          <tbody id="life-table"></tbody>
+        </table>
+      </div>
+      <p class="table-note" data-i18n="tableNote">At risk = just before this time. Hover or tap a heading for its formula.</p>
+      <div class="calculation" id="calculation" role="note" aria-label="Selected calculation" data-i18n-aria="calculationLabel">
+        <div class="equation" id="equation"></div><div class="calc-note" id="calc-note"></div>
+        <div class="risk-change" id="risk-change"></div>
+      </div>
+    </section>
+  </div>
+  <div class="sr-only" id="announcement" aria-live="polite" aria-atomic="true"></div>
+  <footer>
+    <span class="keys" data-i18n="keys">← → Step &nbsp;·&nbsp; Space Play / pause</span>
+  </footer>
+  <p class="credit" data-i18n="credit">Developed by <a href="https://profiles.sydney.edu.au/armando.teixeira-pinto" target="_blank" rel="noreferrer">Armando Teixeira-Pinto</a> and Codex.</p>
+</main>
+
+<dialog id="problem-description" aria-labelledby="problem-title">
+  <h2 id="problem-title" data-i18n="problemTitle">Problem description</h2>
+  <p data-i18n="problemText">Twenty-one adults aged 70 or older with newly diagnosed acute myeloid leukemia (AML), judged not fit for intensive chemotherapy, started lower-intensity treatment. Patients were recruited over several months and the data were analysed at a fixed date, so follow-up ranges up to 35 weeks. The outcome is death from any cause. Patients still alive at the analysis date, or lost to follow-up, are censored at their last contact. The following survival times, in weeks from the start of treatment, were recorded:</p>
+  <p data-i18n="problemTimes"><strong>Survival times (21 patients):</strong> 6, 6, 6, 7, 10, 13, 16, 22, 23, 6+, 9+, 10+, 11+, 17+, 19+, 20+, 25+, 32+, 32+, 34+, 35+</p>
+  <p data-i18n="problemNote">“+” denotes a censored observation: the patient was alive when last seen. This is an illustrative example; the times are adapted from the remission times of the 6-mercaptopurine group in Freireich et al. (1963).</p>
+  <form method="dialog"><button class="primary" autofocus data-i18n="close">Close</button></form>
+</dialog>
+<div id="help-time" class="column-tooltip" role="tooltip" hidden data-i18n="helpTime">The recorded week of a death or censoring, measured from the start of follow-up.<span class="tooltip-formula">tᵢ = observed follow-up time (weeks)</span></div>
+<div id="help-risk" class="column-tooltip" role="tooltip" hidden data-i18n="helpRisk">Patients still alive and under observation just before this week. Include patients who die or are censored at this week.<span class="tooltip-formula">nᵢ = number with follow-up ≥ tᵢ</span></div>
+<div id="help-events" class="column-tooltip" role="tooltip" hidden data-i18n="helpEvents">Deaths at this week. Tied deaths are counted together; censored observations are excluded.<span class="tooltip-formula">dᵢ = number of deaths at tᵢ</span></div>
+<div id="help-censored" class="column-tooltip" role="tooltip" hidden data-i18n="helpCensored">Patients whose observation ends at this week without an observed death. They leave the next risk set.<span class="tooltip-formula">cᵢ = number censored at tᵢ<br>n after tᵢ = nᵢ − dᵢ − cᵢ</span></div>
+<div id="help-probability" class="column-tooltip" role="tooltip" hidden data-i18n="helpProbability">Conditional probability of surviving this week, given being alive and at risk just before it. With no deaths, it equals 1.<span class="tooltip-formula">pᵢ = 1 − dᵢ/nᵢ = (nᵢ − dᵢ)/nᵢ</span></div>
+<div id="help-survival" class="column-tooltip" role="tooltip" hidden data-i18n="helpSurvival">Cumulative probability of surviving beyond this week. Multiply the conditional probabilities through this time.<span class="tooltip-formula">Ŝ(tᵢ) = Ŝ(tᵢ⁻) × (1 − dᵢ/nᵢ)<br>Ŝ(t) = ∏<sub>tᵢ ≤ t</sub> (1 − dᵢ/nᵢ)</span></div>
+<script>
+'use strict';
+// Interface text by language. Static keys match data-i18n / data-i18n-aria attributes in the markup.
+const I18N = {
+  en: {
+    pageTitle:'Kaplan–Meier & RMST · a step at a time', heading:'Kaplan–Meier estimator', subtitle:'21 patients · time in weeks', problemLink:'Problem description',
+    controls:'Presentation controls', restart:'Restart', restartLabel:'Return to time zero', previous:'← Previous', next:'Next →', play:'Play', pause:'Pause',
+    fullscreen:'Full screen', exitFullscreen:'Exit full screen', fullscreenFallback:'Use browser full screen',
+    followTitle:'Patient follow-up', followLabel:'Follow-up of 21 patients', death:'Death', censored:'Censored', atRisk:'At risk',
+    survivalTitle:'Survival curve', survivalLabel:'Kaplan–Meier survival estimate', tableTitle:'Life table', tablePrompt:'Select a time to reveal the curve.', tableLabel:'Kaplan–Meier life table',
+    colTime:'Week<br>t', colRisk:'At risk<br>n', colEvents:'Deaths<br>d', colCensored:'Cens.<br>c', colProbability:'Prob of surviving<br><span class="heading-formula">1 − d/n</span>', colSurvival:'Survival<br>Ŝ(t)',
+    tableNote:'At risk = just before this time. Hover or tap a heading for its formula.', calculationLabel:'Selected calculation',
+    keys:'← → Step &nbsp;·&nbsp; Space Play / pause',
+    credit:'Developed by <a href="https://profiles.sydney.edu.au/armando.teixeira-pinto" target="_blank" rel="noreferrer">Armando Teixeira-Pinto</a> and Codex.',
+    problemTitle:'Problem description',
+    problemText:'Twenty-one adults aged 70 or older with newly diagnosed acute myeloid leukemia (AML), judged not fit for intensive chemotherapy, started lower-intensity treatment. Patients were recruited over several months and the data were analysed at a fixed date, so follow-up ranges up to 35 weeks. The outcome is death from any cause. Patients still alive at the analysis date, or lost to follow-up, are censored at their last contact. The following survival times, in weeks from the start of treatment, were recorded:',
+    problemTimes:'<strong>Survival times (21 patients):</strong> 6, 6, 6, 7, 10, 13, 16, 22, 23, 6+, 9+, 10+, 11+, 17+, 19+, 20+, 25+, 32+, 32+, 34+, 35+',
+    problemNote:'“+” denotes a censored observation: the patient was alive when last seen. This is an illustrative example; the times are adapted from the remission times of the 6-mercaptopurine group in Freireich et al. (1963).',
+    close:'Close',
+    helpTime:'The recorded week of a death or censoring, measured from the start of follow-up.<span class="tooltip-formula">tᵢ = observed follow-up time (weeks)</span>',
+    helpRisk:'Patients still alive and under observation just before this week. Include patients who die or are censored at this week.<span class="tooltip-formula">nᵢ = number with follow-up ≥ tᵢ</span>',
+    helpEvents:'Deaths at this week. Tied deaths are counted together; censored observations are excluded.<span class="tooltip-formula">dᵢ = number of deaths at tᵢ</span>',
+    helpCensored:'Patients whose observation ends at this week without an observed death. They leave the next risk set.<span class="tooltip-formula">cᵢ = number censored at tᵢ<br>n after tᵢ = nᵢ − dᵢ − cᵢ</span>',
+    helpProbability:'Conditional probability of surviving this week, given being alive and at risk just before it. With no deaths, it equals 1.<span class="tooltip-formula">pᵢ = 1 − dᵢ/nᵢ = (nᵢ − dᵢ)/nᵢ</span>',
+    helpSurvival:'Cumulative probability of surviving beyond this week. Multiply the conditional probabilities through this time.<span class="tooltip-formula">Ŝ(tᵢ) = Ŝ(tᵢ⁻) × (1 − dᵢ/nᵢ)<br>Ŝ(t) = ∏<sub>tᵢ ≤ t</sub> (1 − dᵢ/nᵢ)</span>',
+    decimal:'.', timeAxis:'Time (weeks)', survivalAxis:'Survival (%)', week:t=>`Week ${t}`, rowLabel:(t,base)=>`Week ${t}${base?', baseline':''}`,
+    followTitleText:(n,t,ids)=>`Patient follow-up. ${n} patients at risk just before week ${t}: ${ids}.`,
+    curveTitleText:(t,s)=>`Kaplan–Meier survival curve through week ${t}: survival ${s}.`,
+    riskLabel:(n,t)=>`<strong>${n} at risk</strong> just before week ${t}`,
+    baselineNote:n=>`All ${n} patients start under observation.`, baselineRisk:n=>`<strong>${n}</strong> at risk at baseline`,
+    deathNote:(d,n,c)=>`${d===1?'1 death':d+' tied deaths'} among ${n} at risk${c?`; ${c} censored`:''}.`,
+    censorNote:c=>`${c} censored · no death · survival stays the same.`,
+    remaining:t=>`under observation after week ${t}`,
+    optionsLabel:'Display options', showCurve:'Survival curve', showTable:'Life table', showRmst:'Show RMST', horizon:'Time horizon τ', horizonLabel:'Time horizon in weeks', weeksUnit:'weeks',
+    rmstLegend:'RMST = area under the curve up to τ', weeksShort:'wk',
+    rmstFull:(tau,v)=>`RMST(${tau}) = <span class="rmst-value">${v} weeks</span>`,
+    rmstPartial:(t,tau,v)=>`Area 0–${t} = <span class="rmst-value">${v} weeks</span> · advance to week ${tau} for RMST`,
+    rmstChart:(tau,v)=>`RMST(${tau}) = ${v} wk`, rmstChartPartial:v=>`Area so far = ${v} wk`,
+    rmstMeaning:(tau,v)=>`On average, patients survive ${v} of the first ${tau} weeks.`,
+    announcement:(t,n,d,c,s,r)=>`Week ${t}. ${n} at risk just before this time, ${d} deaths, ${c} censored. Survival ${s}. ${r} remain under observation.`,
+  },
+  es: {
+    pageTitle:'Kaplan–Meier y RMST · paso a paso', heading:'Estimador de Kaplan–Meier', subtitle:'21 pacientes · tiempo en semanas', problemLink:'Descripción del problema',
+    controls:'Controles de presentación', restart:'Reiniciar', restartLabel:'Volver al tiempo cero', previous:'← Anterior', next:'Siguiente →', play:'Reproducir', pause:'Pausa',
+    fullscreen:'Pantalla completa', exitFullscreen:'Salir de pantalla completa', fullscreenFallback:'Usa la pantalla completa del navegador',
+    followTitle:'Seguimiento de pacientes', followLabel:'Seguimiento de 21 pacientes', death:'Muerte', censored:'Censurado', atRisk:'En riesgo',
+    survivalTitle:'Curva de supervivencia', survivalLabel:'Estimación de supervivencia de Kaplan–Meier', tableTitle:'Tabla de vida', tablePrompt:'Selecciona un tiempo para revelar la curva.', tableLabel:'Tabla de vida de Kaplan–Meier',
+    colTime:'Semana<br>t', colRisk:'En riesgo<br>n', colEvents:'Muertes<br>d', colCensored:'Cens.<br>c', colProbability:'Prob. de sobrevivir<br><span class="heading-formula">1 − d/n</span>', colSurvival:'Supervivencia<br>Ŝ(t)',
+    tableNote:'En riesgo = justo antes de este tiempo. Pasa el cursor o toca un encabezado para ver su fórmula.', calculationLabel:'Cálculo seleccionado',
+    keys:'← → Avanzar &nbsp;·&nbsp; Espacio Reproducir / pausa',
+    credit:'Desarrollado por <a href="https://profiles.sydney.edu.au/armando.teixeira-pinto" target="_blank" rel="noreferrer">Armando Teixeira-Pinto</a> y Codex.',
+    problemTitle:'Descripción del problema',
+    problemText:'Veintiún adultos de 70 años o más con leucemia mieloide aguda (LMA) recién diagnosticada, considerados no aptos para quimioterapia intensiva, iniciaron un tratamiento de menor intensidad. Los pacientes se reclutaron a lo largo de varios meses y los datos se analizaron en una fecha fija, por lo que el seguimiento llega hasta 35 semanas. El desenlace es la muerte por cualquier causa. Los pacientes que seguían vivos en la fecha del análisis, o que se perdieron durante el seguimiento, se censuran en su último contacto. Se registraron los siguientes tiempos de supervivencia, en semanas desde el inicio del tratamiento:',
+    problemTimes:'<strong>Tiempos de supervivencia (21 pacientes):</strong> 6, 6, 6, 7, 10, 13, 16, 22, 23, 6+, 9+, 10+, 11+, 17+, 19+, 20+, 25+, 32+, 32+, 34+, 35+',
+    problemNote:'«+» indica una observación censurada: el paciente estaba vivo la última vez que se le vio. Es un ejemplo ilustrativo; los tiempos están adaptados de los tiempos de remisión del grupo de 6-mercaptopurina de Freireich et al. (1963).',
+    close:'Cerrar',
+    helpTime:'La semana registrada de una muerte o censura, medida desde el inicio del seguimiento.<span class="tooltip-formula">tᵢ = tiempo de seguimiento observado (semanas)</span>',
+    helpRisk:'Pacientes aún vivos y en observación justo antes de esta semana. Incluye a los pacientes que mueren o se censuran en esta semana.<span class="tooltip-formula">nᵢ = número con seguimiento ≥ tᵢ</span>',
+    helpEvents:'Muertes en esta semana. Las muertes empatadas se cuentan juntas; las observaciones censuradas se excluyen.<span class="tooltip-formula">dᵢ = número de muertes en tᵢ</span>',
+    helpCensored:'Pacientes cuya observación termina en esta semana sin una muerte observada. Salen del siguiente conjunto de riesgo.<span class="tooltip-formula">cᵢ = número de censurados en tᵢ<br>n después de tᵢ = nᵢ − dᵢ − cᵢ</span>',
+    helpProbability:'Probabilidad condicional de sobrevivir a esta semana, dado que se está vivo y en riesgo justo antes. Sin muertes, es igual a 1.<span class="tooltip-formula">pᵢ = 1 − dᵢ/nᵢ = (nᵢ − dᵢ)/nᵢ</span>',
+    helpSurvival:'Probabilidad acumulada de sobrevivir más allá de esta semana. Se multiplican las probabilidades condicionales hasta este tiempo.<span class="tooltip-formula">Ŝ(tᵢ) = Ŝ(tᵢ⁻) × (1 − dᵢ/nᵢ)<br>Ŝ(t) = ∏<sub>tᵢ ≤ t</sub> (1 − dᵢ/nᵢ)</span>',
+    decimal:',', timeAxis:'Tiempo (semanas)', survivalAxis:'Supervivencia (%)', week:t=>`Semana ${t}`, rowLabel:(t,base)=>`Semana ${t}${base?', inicio':''}`,
+    followTitleText:(n,t,ids)=>`Seguimiento de pacientes. ${n} pacientes en riesgo justo antes de la semana ${t}: ${ids}.`,
+    curveTitleText:(t,s)=>`Curva de supervivencia de Kaplan–Meier hasta la semana ${t}: supervivencia ${s}.`,
+    riskLabel:(n,t)=>`<strong>${n} en riesgo</strong> justo antes de la semana ${t}`,
+    baselineNote:n=>`Los ${n} pacientes empiezan en observación.`, baselineRisk:n=>`<strong>${n}</strong> en riesgo al inicio`,
+    deathNote:(d,n,c)=>`${d===1?'1 muerte':d+' muertes empatadas'} entre ${n} en riesgo${c?`; ${c} ${c===1?'censurado':'censurados'}`:''}.`,
+    censorNote:c=>`${c} ${c===1?'censurado':'censurados'} · ninguna muerte · la supervivencia no cambia.`,
+    remaining:t=>`en observación después de la semana ${t}`,
+    optionsLabel:'Opciones de visualización', showCurve:'Curva de supervivencia', showTable:'Tabla de vida', showRmst:'Mostrar RMST', horizon:'Horizonte temporal τ', horizonLabel:'Horizonte temporal en semanas', weeksUnit:'semanas',
+    rmstLegend:'RMST = área bajo la curva hasta τ', weeksShort:'sem',
+    rmstFull:(tau,v)=>`RMST(${tau}) = <span class="rmst-value">${v} semanas</span>`,
+    rmstPartial:(t,tau,v)=>`Área 0–${t} = <span class="rmst-value">${v} semanas</span> · avanza hasta la semana ${tau} para el RMST`,
+    rmstChart:(tau,v)=>`RMST(${tau}) = ${v} sem`, rmstChartPartial:v=>`Área hasta ahora = ${v} sem`,
+    rmstMeaning:(tau,v)=>`En promedio, los pacientes sobreviven ${v} de las primeras ${tau} semanas.`,
+    announcement:(t,n,d,c,s,r)=>`Semana ${t}. ${n} en riesgo justo antes de este tiempo, ${d} muertes, ${c} censurados. Supervivencia ${s}. ${r} siguen en observación.`,
+  },
+  pt: {
+    pageTitle:'Kaplan–Meier e RMST · passo a passo', heading:'Estimador de Kaplan–Meier', subtitle:'21 doentes · tempo em semanas', problemLink:'Descrição do problema',
+    controls:'Controlos de apresentação', restart:'Reiniciar', restartLabel:'Voltar ao tempo zero', previous:'← Anterior', next:'Seguinte →', play:'Reproduzir', pause:'Pausa',
+    fullscreen:'Ecrã inteiro', exitFullscreen:'Sair do ecrã inteiro', fullscreenFallback:'Use o ecrã inteiro do navegador',
+    followTitle:'Seguimento dos doentes', followLabel:'Seguimento de 21 doentes', death:'Óbito', censored:'Censurado', atRisk:'Em risco',
+    survivalTitle:'Curva de sobrevivência', survivalLabel:'Estimativa de sobrevivência de Kaplan–Meier', tableTitle:'Tabela de vida', tablePrompt:'Selecione um tempo para revelar a curva.', tableLabel:'Tabela de vida de Kaplan–Meier',
+    colTime:'Semana<br>t', colRisk:'Em risco<br>n', colEvents:'Óbitos<br>d', colCensored:'Cens.<br>c', colProbability:'Prob. de sobreviver<br><span class="heading-formula">1 − d/n</span>', colSurvival:'Sobrevivência<br>Ŝ(t)',
+    tableNote:'Em risco = imediatamente antes deste tempo. Passe o cursor ou toque num cabeçalho para ver a fórmula.', calculationLabel:'Cálculo selecionado',
+    keys:'← → Avançar &nbsp;·&nbsp; Espaço Reproduzir / pausa',
+    credit:'Desenvolvido por <a href="https://profiles.sydney.edu.au/armando.teixeira-pinto" target="_blank" rel="noreferrer">Armando Teixeira-Pinto</a> e Codex.',
+    problemTitle:'Descrição do problema',
+    problemText:'Vinte e um adultos com 70 ou mais anos, com leucemia mieloide aguda (LMA) recém-diagnosticada e considerados não elegíveis para quimioterapia intensiva, iniciaram um tratamento de menor intensidade. Os doentes foram recrutados ao longo de vários meses e os dados foram analisados numa data fixa, pelo que o seguimento vai até 35 semanas. O desfecho é a morte por qualquer causa. Os doentes ainda vivos na data da análise, ou perdidos para seguimento, são censurados no último contacto. Foram registados os seguintes tempos de sobrevivência, em semanas desde o início do tratamento:',
+    problemTimes:'<strong>Tempos de sobrevivência (21 doentes):</strong> 6, 6, 6, 7, 10, 13, 16, 22, 23, 6+, 9+, 10+, 11+, 17+, 19+, 20+, 25+, 32+, 32+, 34+, 35+',
+    problemNote:'«+» indica uma observação censurada: o doente estava vivo no último contacto. Trata-se de um exemplo ilustrativo; os tempos foram adaptados dos tempos de remissão do grupo da 6-mercaptopurina de Freireich et al. (1963).',
+    close:'Fechar',
+    helpTime:'A semana registada de um óbito ou censura, medida desde o início do seguimento.<span class="tooltip-formula">tᵢ = tempo de seguimento observado (semanas)</span>',
+    helpRisk:'Doentes ainda vivos e em observação imediatamente antes desta semana. Inclui os doentes que morrem ou são censurados nesta semana.<span class="tooltip-formula">nᵢ = número com seguimento ≥ tᵢ</span>',
+    helpEvents:'Óbitos nesta semana. Os óbitos empatados contam-se em conjunto; as observações censuradas são excluídas.<span class="tooltip-formula">dᵢ = número de óbitos em tᵢ</span>',
+    helpCensored:'Doentes cuja observação termina nesta semana sem óbito observado. Saem do conjunto de risco seguinte.<span class="tooltip-formula">cᵢ = número de censurados em tᵢ<br>n após tᵢ = nᵢ − dᵢ − cᵢ</span>',
+    helpProbability:'Probabilidade condicional de sobreviver a esta semana, dado estar vivo e em risco imediatamente antes. Sem óbitos, é igual a 1.<span class="tooltip-formula">pᵢ = 1 − dᵢ/nᵢ = (nᵢ − dᵢ)/nᵢ</span>',
+    helpSurvival:'Probabilidade acumulada de sobreviver para além desta semana. Multiplicam-se as probabilidades condicionais até este tempo.<span class="tooltip-formula">Ŝ(tᵢ) = Ŝ(tᵢ⁻) × (1 − dᵢ/nᵢ)<br>Ŝ(t) = ∏<sub>tᵢ ≤ t</sub> (1 − dᵢ/nᵢ)</span>',
+    decimal:',', timeAxis:'Tempo (semanas)', survivalAxis:'Sobrevivência (%)', week:t=>`Semana ${t}`, rowLabel:(t,base)=>`Semana ${t}${base?', início':''}`,
+    followTitleText:(n,t,ids)=>`Seguimento dos doentes. ${n} doentes em risco imediatamente antes da semana ${t}: ${ids}.`,
+    curveTitleText:(t,s)=>`Curva de sobrevivência de Kaplan–Meier até à semana ${t}: sobrevivência ${s}.`,
+    riskLabel:(n,t)=>`<strong>${n} em risco</strong> imediatamente antes da semana ${t}`,
+    baselineNote:n=>`Os ${n} doentes começam em observação.`, baselineRisk:n=>`<strong>${n}</strong> em risco no início`,
+    deathNote:(d,n,c)=>`${d===1?'1 óbito':d+' óbitos empatados'} entre ${n} em risco${c?`; ${c} ${c===1?'censurado':'censurados'}`:''}.`,
+    censorNote:c=>`${c} ${c===1?'censurado':'censurados'} · nenhum óbito · a sobrevivência mantém-se.`,
+    remaining:t=>`em observação após a semana ${t}`,
+    optionsLabel:'Opções de visualização', showCurve:'Curva de sobrevivência', showTable:'Tabela de vida', showRmst:'Mostrar RMST', horizon:'Horizonte temporal τ', horizonLabel:'Horizonte temporal em semanas', weeksUnit:'semanas',
+    rmstLegend:'RMST = área sob a curva até τ', weeksShort:'sem',
+    rmstFull:(tau,v)=>`RMST(${tau}) = <span class="rmst-value">${v} semanas</span>`,
+    rmstPartial:(t,tau,v)=>`Área 0–${t} = <span class="rmst-value">${v} semanas</span> · avance até à semana ${tau} para o RMST`,
+    rmstChart:(tau,v)=>`RMST(${tau}) = ${v} sem`, rmstChartPartial:v=>`Área até agora = ${v} sem`,
+    rmstMeaning:(tau,v)=>`Em média, os doentes sobrevivem ${v} das primeiras ${tau} semanas.`,
+    announcement:(t,n,d,c,s,r)=>`Semana ${t}. ${n} em risco imediatamente antes deste tempo, ${d} óbitos, ${c} censurados. Sobrevivência ${s}. ${r} continuam em observação.`,
+  },
+};
+// English is the default; ?lang= in the URL wins over a remembered choice.
+function storedLanguage() { try { return localStorage.getItem('km-lang'); } catch { return null; } }
+let lang=[new URLSearchParams(location.search).get('lang'),storedLanguage()].find(code=>code in I18N)||'en';
+const t=key=>I18N[lang][key];
+// Supplied observations in order; '+' denotes right censoring.
+const observations = ['6', '6', '6', '6+', '7', '9+', '10', '10+', '11+',
+  '13', '16', '17+', '19+', '20+', '22', '23', '25+', '32+', '32+', '34+', '35+'];
+const patients = observations.map((value, index) => ({
+  id: `P${index + 1}`, time: Number(value.replace('+', '')), event: !value.endsWith('+')
+}));
+function buildLifeTable(cohort) {
+  let survival = 1;
+  const result = [{time:0,n:cohort.length,d:0,c:0,before:1,s:1,remaining:cohort.length}];
+  for (const time of [...new Set(cohort.map(p=>p.time))].sort((a,b)=>a-b)) {
+    const n = cohort.filter(p=>p.time>=time).length;
+    const d = cohort.filter(p=>p.time===time&&p.event).length;
+    const c = cohort.filter(p=>p.time===time&&!p.event).length;
+    const before = survival;
+    survival *= 1-d/n;
+    result.push({time,n,d,c,before,s:survival,remaining:n-d-c});
+  }
+  return result;
+}
+const rows = buildLifeTable(patients);
+const maxTime = Math.max(...patients.map(p=>p.time));
+// Keep patient labels and risk-set markers legible as the cohort grows.
+document.documentElement.style.setProperty('--cohort-chart-height', `${patients.length * 28 + 85}px`);
+const timeTicks = [0, 10, 20, 30, maxTime];
+const el = id=>document.getElementById(id);
+const percent = n=>(n*100).toFixed(1).replace('.',t('decimal'))+'%';
+const ns = 'http://www.w3.org/2000/svg';
+let selected=0, playback=null, animation=null;
+const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+function svgNode(tag,attrs={},text='') {
+  const node=document.createElementNS(ns,tag);
+  for(const [key,value] of Object.entries(attrs)) node.setAttribute(key,value);
+  if(text) node.textContent=text;
+  return node;
+}
+function add(svg,tag,attrs,text) { const node=svgNode(tag,attrs,text); svg.append(node); return node; }
+function line(svg,x1,y1,x2,y2,attrs={}) { return add(svg,'line',{x1,y1,x2,y2,...attrs}); }
+function label(svg,x,y,text,attrs={}) { return add(svg,'text',{x,y,...attrs},text); }
+function prepare(svg,description) {
+  svg.replaceChildren();
+  const w=svg.getBoundingClientRect().width, h=svg.getBoundingClientRect().height;
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  add(svg,'title',{},description);
+  return {w,h};
+}
+function endpoint(svg,x,y,event,opacity=1) {
+  if(event) {
+    line(svg,x-5,y-5,x+5,y+5,{stroke:'var(--event)','stroke-width':3,opacity});
+    line(svg,x-5,y+5,x+5,y-5,{stroke:'var(--event)','stroke-width':3,opacity});
+  } else line(svg,x,y-8,x,y+8,{stroke:'var(--censor)','stroke-width':3,opacity});
+}
+function drawFollow(time) {
+  const svg=el('follow'), row=rows[selected];
+  const {w,h}=prepare(svg,t('followTitleText')(row.n,row.time,patients.filter(p=>p.time>=row.time).map(p=>p.id).join(', ')));
+  const left=55,right=w-15,top=25,bottom=h-60;
+  const x=t=>left+(right-left)*t/maxTime;
+  const y=i=>top+(bottom-top)*(i+.5)/patients.length;
+  for(const tick of timeTicks) {
+    line(svg,x(tick),top-9,x(tick),bottom+8,{class:'grid'});
+    label(svg,x(tick),bottom+34,tick.toString(),{'text-anchor':'middle'});
+  }
+  patients.forEach((p,i)=>{
+    const atRisk=p.time>=row.time, ended=p.time<row.time;
+    if(atRisk) add(svg,'rect',{x:0,y:y(i)-13,width:44,height:26,rx:4,fill:'var(--pale)'});
+    label(svg,39,y(i)+6,p.id,{'text-anchor':'end',class:'patient-label','font-weight':atRisk?650:400});
+    line(svg,left,y(i),x(p.time),y(i),{stroke:'#cbd4db','stroke-width':3});
+    const seen=Math.min(p.time,time);
+    if(seen>0) line(svg,left,y(i),x(seen),y(i),{stroke:ended?'#72818c':'var(--blue)','stroke-width':atRisk?4:3});
+    if(atRisk) add(svg,'circle',{cx:x(Math.min(time,p.time)),cy:y(i),r:7,fill:'var(--blue)',stroke:'white','stroke-width':2});
+    endpoint(svg,x(p.time),y(i),p.event,p.time<=time?1:.42);
+  });
+  line(svg,x(time),top-10,x(time),bottom+8,{class:'guide'});
+  line(svg,left,bottom+8,right,bottom+8,{class:'axis'});
+  label(svg,(left+right)/2,h-5,t('timeAxis'),{'text-anchor':'middle',class:'axis-label'});
+}
+function drawCurve(time,dropProgress=1) {
+  const svg=el('survival'), current=rows[selected];
+  const {w,h}=prepare(svg,t('curveTitleText')(current.time,percent(current.s)));
+  const left=61,right=w-17,top=25,bottom=h-60;
+  const x=t=>left+(right-left)*t/maxTime, y=s=>bottom-(bottom-top)*s;
+  for(const tick of [0,.25,.5,.75,1]) {
+    line(svg,left,y(tick),right,y(tick),{class:'grid'});
+    label(svg,left-9,y(tick)+6,(tick*100)+'',{'text-anchor':'end'});
+  }
+  for(const tick of timeTicks) {
+    line(svg,x(tick),top,x(tick),bottom,{class:'grid'});
+    label(svg,x(tick),bottom+34,tick.toString(),{'text-anchor':'middle'});
+  }
+  line(svg,left,top,left,bottom,{class:'axis'});
+  line(svg,left,bottom,right,bottom,{class:'axis'});
+  label(svg,left,top-10,t('survivalAxis'),{class:'axis-label'});
+  label(svg,(left+right)/2,h-5,t('timeAxis'),{'text-anchor':'middle',class:'axis-label'});
+  line(svg,x(time),top,x(time),bottom,{class:'guide'});
+  let path=`M ${x(0)} ${y(1)}`, level=1;
+  const steps=[{time:0,level:1}];
+  rows.slice(1,selected+1).forEach((row,i)=>{
+    if(row.time<=time) {
+      const isCurrent=i+1===selected;
+      level=isCurrent?row.before+(row.s-row.before)*dropProgress:row.s;
+      path+=` H ${x(row.time)} V ${y(level)}`;
+      steps.push({time:row.time,level});
+    }
+  });
+  path+=` H ${x(time)}`;
+  if(options.rmst) drawRmst(svg,steps,time,{x,y,top,bottom,left,right});
+  else { el('rmst-note').innerHTML=''; el('rmst-meaning').hidden=true; }
+  add(svg,'path',{d:path,fill:'none',stroke:'var(--blue)','stroke-width':4,'stroke-linejoin':'round'});
+  rows.slice(1,selected+1).filter(row=>row.c&&row.time<=time).forEach(row=>endpoint(svg,x(row.time),y(row.s),false));
+  // Keep censor marks legible: the active point is a ring rather than a filled dot.
+  add(svg,'circle',{cx:x(time),cy:y(level),r:7,fill:'none',stroke:'var(--blue)','stroke-width':2});
+}
+// Restricted mean survival time: area under the revealed step curve from 0 to min(current time, τ).
+// Once the revealed time reaches τ the area is the full RMST(τ).
+function stepArea(steps,limit) {
+  let area=0;
+  steps.forEach((step,i)=>{
+    const end=Math.min(limit,i+1<steps.length?steps[i+1].time:Infinity);
+    if(end>step.time) area+=step.level*(end-step.time);
+  });
+  return area;
+}
+const weeksValue=v=>v.toFixed(1).replace('.',t('decimal'));
+function drawRmst(svg,steps,time,{x,y,top,bottom,left,right}) {
+  const tau=options.tau, limit=Math.min(time,tau), complete=time>=tau;
+  const area=stepArea(steps,limit);
+  if(limit>0) {
+    let shade=`M ${x(0)} ${y(0)} V ${y(1)}`;
+    steps.slice(1).filter(step=>step.time<limit).forEach(step=>{shade+=` H ${x(step.time)} V ${y(step.level)}`;});
+    shade+=` H ${x(limit)} V ${y(0)} Z`;
+    add(svg,'path',{d:shade,fill:'var(--rmst-fill)',stroke:'none'});
+  }
+  line(svg,x(tau),top,x(tau),bottom,{class:'rmst-guide'});
+  const nearRight=x(tau)>right-80;
+  label(svg,x(tau)+(nearRight?-7:7),top+18,`τ = ${tau}`,{class:'rmst-label','text-anchor':nearRight?'end':'start'});
+  if(limit>0) {
+    const text=complete?t('rmstChart')(tau,weeksValue(area)):t('rmstChartPartial')(weeksValue(area));
+    const mid=Math.max(left+110,Math.min(right-110,(x(0)+x(limit))/2));
+    label(svg,mid,y(.1),text,{class:'rmst-label','text-anchor':'middle'});
+  }
+  el('rmst-note').innerHTML=' · '+(complete?t('rmstFull')(tau,weeksValue(area)):t('rmstPartial')(rows[selected].time,tau,weeksValue(area)));
+  el('rmst-meaning').hidden=!complete;
+  el('rmst-meaning').textContent=complete?t('rmstMeaning')(tau,weeksValue(area)):'';
+}
+// Display options persist per viewer; everything works without storage.
+const options={curve:true,table:true,rmst:false,tau:30};
+try { Object.assign(options,JSON.parse(localStorage.getItem('km2-options'))||{}); } catch {}
+options.tau=Math.max(1,Math.min(maxTime,Math.round(Number(options.tau))||30));
+function saveOptions() { try { localStorage.setItem('km2-options',JSON.stringify(options)); } catch {} }
+function applyOptions() {
+  el('show-curve').checked=options.curve; el('show-table').checked=options.table; el('show-rmst').checked=options.rmst;
+  el('tau').value=options.tau; el('tau-range').value=options.tau;
+  document.querySelector('.curve-section').hidden=!options.curve;
+  document.querySelector('.table-section').hidden=!options.table;
+  const board=document.querySelector('.board');
+  board.classList.toggle('hide-curve',!options.curve); board.classList.toggle('hide-table',!options.table);
+  el('show-rmst').disabled=!options.curve; el('rmst-toggle').classList.toggle('disabled',!options.curve);
+  const horizonOff=!options.curve||!options.rmst;
+  el('tau').disabled=horizonOff; el('tau-range').disabled=horizonOff; el('horizon-control').classList.toggle('disabled',horizonOff);
+  el('rmst-legend').hidden=!options.rmst;
+}
+function redraw() { cancelAnimation();applyOptions();placeCalculation();drawFollow(rows[selected].time);drawCurve(rows[selected].time); }
+el('show-curve').addEventListener('change',e=>{options.curve=e.target.checked;saveOptions();redraw();});
+el('show-table').addEventListener('change',e=>{options.table=e.target.checked;saveOptions();redraw();});
+el('show-rmst').addEventListener('change',e=>{options.rmst=e.target.checked;saveOptions();redraw();});
+function setTau(value,commit) {
+  const v=Math.round(Number(value));
+  if(!Number.isFinite(v)||v<1||v>maxTime) { if(commit) el('tau').value=options.tau; return; }
+  options.tau=v;saveOptions();redraw();
+}
+el('tau-range').addEventListener('input',e=>setTau(e.target.value));
+el('tau').addEventListener('input',e=>setTau(e.target.value));
+el('tau').addEventListener('change',e=>setTau(Math.max(1,Math.min(maxTime,Number(e.target.value)||options.tau)),true));
+function renderTable() {
+  el('life-table').innerHTML=rows.map((row,i)=>`<tr class="${i===selected?'selected':''}" data-index="${i}">
+    <td><button type="button" class="row-button" aria-label="${t('rowLabel')(row.time,i===0)}" aria-pressed="${i===selected}">${row.time}</button></td>
+    <td>${row.n}</td><td>${row.d}</td><td>${row.c}</td><td class="${i>selected?'unrevealed':''}">${i<=selected?percent(1-row.d/row.n):'—'}</td><td class="${i>selected?'unrevealed':''}">${i<=selected?percent(row.s):'—'}</td></tr>`).join('');
+}
+function renderText() {
+  const row=rows[selected];
+  el('time-label').innerHTML=`${t('week')(row.time)} <span class="step">${selected+1} / ${rows.length}</span>`;
+  el('risk-label').innerHTML=t('riskLabel')(row.n,row.time);
+  el('survival-label').innerHTML=`Ŝ(${row.time}) = <strong>${percent(row.s)}</strong>`;
+  if(selected===0) {
+    el('equation').innerHTML=`Ŝ(0) = <span class="answer">${percent(1)}</span>`;
+    el('calc-note').textContent=t('baselineNote')(patients.length);
+    el('risk-change').innerHTML=t('baselineRisk')(patients.length);
+  } else {
+    el('equation').innerHTML=`<span>Ŝ(${row.time}) = ${percent(row.before)} ×</span><span>(1 −</span><span class="fraction"><span>${row.d}</span><span>${row.n}</span></span><span>) =</span><span class="answer">${percent(row.s)}</span>`;
+    el('calc-note').textContent=row.d?t('deathNote')(row.d,row.n,row.c):t('censorNote')(row.c);
+    el('risk-change').innerHTML=`<strong>${row.n} − ${row.d} − ${row.c} = ${row.remaining}</strong><br>${t('remaining')(row.time)}`;
+  }
+  el('previous').disabled=selected===0;
+  el('next').disabled=selected===rows.length-1;
+  el('restart').disabled=selected===0&&!playback;
+  el('announcement').textContent=t('announcement')(row.time,row.n,row.d,row.c,percent(row.s),row.remaining);
+}
+// Anchor the calculation callout under the selected row, or above it near the end of the table.
+function placeCalculation() {
+  const box=el('calculation'), section=box.parentElement.getBoundingClientRect();
+  const row=el('life-table').querySelector(`tr[data-index="${selected}"]`).getBoundingClientRect();
+  const tableBottom=el('life-table').getBoundingClientRect().bottom;
+  const below=row.bottom+box.offsetHeight+12<=tableBottom;
+  box.classList.toggle('below',below);box.classList.toggle('above',!below);
+  box.style.top=(below?row.bottom-section.top+10:row.top-section.top-box.offsetHeight-10)+'px';
+}
+function cancelAnimation() { if(animation!==null) cancelAnimationFrame(animation); animation=null; }
+function selectRow(index,animate=true) {
+  const old=selected;
+  selected=Math.max(0,Math.min(rows.length-1,index));
+  cancelAnimation();
+  const focused=el('life-table').contains(document.activeElement);
+  renderTable(); renderText(); placeCalculation();
+  if(focused) el('life-table').querySelector(`tr[data-index="${selected}"] button`).focus({preventScroll:true});
+  const target=rows[selected].time;
+  if(!animate||motion.matches||selected!==old+1) { drawFollow(target);drawCurve(target);return; }
+  const startTime=rows[old].time, start=performance.now(), duration=950;
+  function frame(now) {
+    const progress=Math.min(1,(now-start)/duration);
+    const travel=Math.min(1,progress/.67);
+    const time=startTime+(target-startTime)*(1-Math.pow(1-travel,2));
+    const drop=progress<.67?0:(progress-.67)/.33;
+    drawFollow(time);drawCurve(time,drop);
+    if(progress<1) animation=requestAnimationFrame(frame); else animation=null;
+  }
+  animation=requestAnimationFrame(frame);
+}
+function stop() {
+  if(playback) clearInterval(playback);
+  playback=null;
+  el('play').textContent=t('play');el('play').setAttribute('aria-pressed','false');
+  el('restart').disabled=selected===0;
+}
+function togglePlay() {
+  if(playback) {stop();cancelAnimation();drawFollow(rows[selected].time);drawCurve(rows[selected].time);return;}
+  if(selected===rows.length-1) selectRow(0,false);
+  el('play').textContent=t('pause');el('play').setAttribute('aria-pressed','true');
+  playback=setInterval(()=>{
+    if(selected<rows.length-1) selectRow(selected+1);
+    else stop();
+  },2000);
+  el('restart').disabled=false;
+}
+el('life-table').addEventListener('click',event=>{
+  const row=event.target.closest('tr[data-index]');
+  if(row) {stop();selectRow(Number(row.dataset.index));}
+});
+el('previous').addEventListener('click',()=>{stop();selectRow(selected-1);});
+el('next').addEventListener('click',()=>{stop();selectRow(selected+1);});
+el('restart').addEventListener('click',()=>{stop();selectRow(0);});
+el('play').addEventListener('click',togglePlay);
+document.addEventListener('keydown',event=>{
+  if(el('problem-description').open) return;
+  if(event.altKey||event.ctrlKey||event.metaKey||/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)||event.target.isContentEditable) return;
+  if(event.key==='ArrowRight') {event.preventDefault();stop();selectRow(selected+1);}
+  if(event.key==='ArrowLeft') {event.preventDefault();stop();selectRow(selected-1);}
+  if(event.code==='Space'&&!event.target.closest('button,summary,a')) {event.preventDefault();togglePlay();}
+});
+el('fullscreen').addEventListener('click',async()=>{
+  try {if(document.fullscreenElement) await document.exitFullscreen();else await document.documentElement.requestFullscreen();}
+  catch {el('fullscreen').textContent=t('fullscreenFallback');}
+});
+function fullscreenLabel() { el('fullscreen').textContent=t(document.fullscreenElement?'exitFullscreen':'fullscreen'); }
+document.addEventListener('fullscreenchange',fullscreenLabel);
+document.addEventListener('visibilitychange',()=>{if(document.hidden) stop();});
+
+// Header explanations are available on hover, keyboard focus, and touch.
+let activeHelp=null, helpTrigger=null, helpTimer=null;
+function hideHelp() {
+  clearTimeout(helpTimer);
+  if(activeHelp) activeHelp.hidden=true;
+  activeHelp=null;helpTrigger=null;
+}
+function showHelp(button) {
+  hideHelp();
+  helpTrigger=button;activeHelp=el(button.dataset.help);activeHelp.hidden=false;
+  const anchor=button.getBoundingClientRect(), box=activeHelp.getBoundingClientRect();
+  activeHelp.style.left=Math.max(12,Math.min(anchor.left,window.innerWidth-box.width-12))+'px';
+  activeHelp.style.top=(anchor.bottom+box.height+10<=window.innerHeight?anchor.bottom+8:Math.max(12,anchor.top-box.height-8))+'px';
+}
+function deferHideHelp() { clearTimeout(helpTimer);helpTimer=setTimeout(hideHelp,180); }
+document.addEventListener('pointerover',event=>{
+  const button=event.target.closest('.heading-help');
+  if(button&&button!==helpTrigger) showHelp(button);
+  if(event.target.closest('.column-tooltip')) clearTimeout(helpTimer);
+});
+document.addEventListener('pointerout',event=>{
+  const region=event.target.closest('.heading-help,.column-tooltip');
+  if(region&&!region.contains(event.relatedTarget)) deferHideHelp();
+});
+document.addEventListener('focusin',event=>{
+  const button=event.target.closest('.heading-help');if(button) showHelp(button);
+});
+document.addEventListener('focusout',event=>{if(event.target.closest('.heading-help')) deferHideHelp();});
+document.addEventListener('click',event=>{
+  const button=event.target.closest('.heading-help');
+  if(button) showHelp(button);else if(!event.target.closest('.column-tooltip')) hideHelp();
+});
+document.addEventListener('keydown',event=>{if(event.key==='Escape') hideHelp();});
+document.addEventListener('scroll',hideHelp,true);
+window.addEventListener('resize',hideHelp);
+el('problem-link').addEventListener('click',event=>{
+  event.preventDefault();stop();hideHelp();el('problem-description').showModal();
+});
+
+function setLanguage(code) {
+  lang=code;
+  document.documentElement.lang=code;
+  document.title=t('pageTitle');
+  document.querySelectorAll('[data-i18n]').forEach(node=>{node.innerHTML=t(node.dataset.i18n);});
+  document.querySelectorAll('[data-i18n-aria]').forEach(node=>node.setAttribute('aria-label',t(node.dataset.i18nAria)));
+  document.querySelectorAll('.lang').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.lang===code)));
+  el('play').textContent=t(playback?'pause':'play');
+  fullscreenLabel();
+}
+document.querySelector('.languages').addEventListener('click',event=>{
+  const button=event.target.closest('.lang');
+  if(!button||button.dataset.lang===lang) return;
+  hideHelp();setLanguage(button.dataset.lang);
+  try { localStorage.setItem('km-lang',lang); } catch {}
+  const url=new URL(location.href);
+  if(lang==='en') url.searchParams.delete('lang'); else url.searchParams.set('lang',lang);
+  history.replaceState(null,'',url);
+  cancelAnimation();renderTable();renderText();placeCalculation();drawFollow(rows[selected].time);drawCurve(rows[selected].time);
+});
+
+setLanguage(lang);
+applyOptions();
+new ResizeObserver(()=>{cancelAnimation();placeCalculation();drawFollow(rows[selected].time);drawCurve(rows[selected].time);}).observe(document.querySelector('.board'));
+selectRow(0,false);
+</script>
+</body>
+</html>

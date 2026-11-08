@@ -644,7 +644,7 @@
     hazard: makeHazard,
     nn: makeNN, mcmc: makeMh("card"), nlin: makeNlin, corr: makeCorr, contbin: makeContBin,
     dummy: makeDummy, rand: makeRand, power: makePower, clt: makeClt, galton: makeGalton,
-    monty: makeMonty, ht: makeHt, roc: makeRoc, km: makeKm, lmm: makeLmm,
+    monty: makeMonty, ht: makeHt, roc: makeRoc, km: makeKm, km2: makeKm, lmm: makeLmm,
   };
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
