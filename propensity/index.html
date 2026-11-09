@@ -57,11 +57,11 @@ input[type=range]{accent-color:var(--ink);width:120px}
 button:focus-visible,input:focus-visible{outline:3px solid var(--ctl);outline-offset:2px}
 .stage{background:var(--surface);border-radius:16px;border:1px solid var(--grid);overflow:hidden}
 .stage svg{display:block;width:100%;height:auto}
-.person{transition:transform .95s cubic-bezier(.65,0,.25,1),opacity .6s ease}
 .person.pe{fill:var(--pe)} .person.ctl{fill:var(--ctl)}
 .person.clone{fill-opacity:.4}
-.noanim .person{transition:none!important}
-.enter > *{animation:fadein .55s .45s both}
+.badge{fill:var(--ink);fill-opacity:1;stroke:var(--surface);stroke-width:1.6}
+.person:not(.esrd) .badge{display:none}
+.enter > *{animation:fadein .5s .85s both}
 @keyframes fadein{from{opacity:0}}
 .grid{stroke:var(--grid);stroke-width:1.2}
 .axis{stroke:var(--faint);stroke-width:2}
@@ -88,7 +88,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ctl);outline-of
 .truth{stroke:var(--ink);stroke-dasharray:4 4;stroke-width:1.5}
 .tl{font:700 11px var(--f-body);fill:var(--ink);letter-spacing:.05em}
 .tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font:500 .8rem/1.45 var(--f-mono);padding:6px 10px;border-radius:8px;white-space:pre;z-index:5}
-@media (prefers-reduced-motion:reduce){.person{transition:none!important}.enter > *{animation:none}}
+@media (prefers-reduced-motion:reduce){.enter > *{animation:none}}
 
 body{margin:0}
 [hidden]{display:none!important}
@@ -102,7 +102,7 @@ body{margin:0}
     <div><h1 id="h1">Propensity score matching</h1><p class="sub">Does <b class="pe">preeclampsia</b> raise the risk of <b>ESRD</b>? Confounders: BMI, age</p></div>
     <div class="hright">
       <span class="seg big" role="group" aria-label="Method"><button id="m-psm" type="button" aria-pressed="true">Matching</button><button id="m-ipw" type="button" aria-pressed="false">IPW</button></span>
-      <div class="legend" aria-label="Body width shows BMI"><svg viewBox="0 0 96 34" aria-hidden="true"><g class="lg" transform="translate(12 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="3" ry="9"/></g><path d="M26 20h22m-5-4 5 4-5 4" stroke="currentColor" fill="none" stroke-width="1.6"/><g class="lg" transform="translate(66 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="9" ry="9"/></g></svg>BMI</div>
+      <div class="legend" aria-label="Body width shows BMI"><svg viewBox="0 0 96 34" aria-hidden="true"><g class="lg" transform="translate(12 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="3" ry="9"/></g><path d="M26 20h22m-5-4 5 4-5 4" stroke="currentColor" fill="none" stroke-width="1.6"/><g class="lg" transform="translate(66 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="9" ry="9"/></g></svg>BMI<svg viewBox="0 0 30 34" aria-hidden="true" style="margin-left:10px"><g class="lg" transform="translate(13 19)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="6" ry="9"/><circle class="badge" cx="5.6" cy="-15.6" r="3.8" style="stroke:var(--bg)"/></g></svg>ESRD</div>
     </div>
   </header>
   <div class="bar">
@@ -140,14 +140,15 @@ const wmean=(a,f,w)=>{let s=0,t=0;a.forEach(p=>{s+=w(p)*f(p);t+=w(p)});return t?
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function normal(r){let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r())}
 // Toy outcome model: ESRD risk rises with BMI and age; preeclampsia multiplies it by S.rr
-function riskOf(p){return Math.min(.95,.04*Math.exp(.12*(p.bmi-27)+.05*(p.age-30))*(p.pe?S.rr:1))}
+function riskOf(p){return Math.min(.95,.15*Math.exp(.12*(p.bmi-27)+.05*(p.age-30))*(p.pe?S.rr:1))}
 
 function generate(){
   for(let t=0;t<500;t++){
     const r=mulberry32(S.seed*7919+t*31+1),arr=[];
     for(let i=0;i<60;i++){
       const bmi=clamp(27+5*normal(r),18,42),age=clamp(30+4.5*normal(r),18,44);
-      arr.push({id:i,bmi,age,pe:r()<expit(-1+0.28*(bmi-27)+0.12*(age-30))});
+      const pe=r()<expit(-1+0.28*(bmi-27)+0.12*(age-30));
+      arr.push({id:i,bmi,age,pe,u:r()}); // u: fixed uniform draw, ESRD if u < risk
     }
     const n=arr.filter(p=>p.pe).length;
     if(n>=15&&n<=22){people=arr;break}
@@ -181,7 +182,7 @@ function makeIcon(p,cls){
   const g=document.createElementNS(NS,'g');
   g.setAttribute('class','person '+(p.pe?'pe':'ctl')+(cls?' '+cls:''));
   const rx=2.6+(p.bmi-18)*0.27; // body width encodes BMI
-  g.innerHTML=`<circle cx="0" cy="-11" r="4.4"/><ellipse cx="0" cy="4" rx="${rx.toFixed(2)}" ry="9"/>`;
+  g.innerHTML=`<circle cx="0" cy="-11" r="4.4"/><ellipse cx="0" cy="4" rx="${rx.toFixed(2)}" ry="9"/><circle class="badge" cx="5.6" cy="-15.6" r="3.8"/>`;
   g.addEventListener('pointerenter',e=>{tip.textContent=PAGE.tip(p);tip.hidden=false;moveTip(e)});
   g.addEventListener('pointermove',moveTip);
   g.addEventListener('pointerleave',()=>{tip.hidden=true});
@@ -193,19 +194,38 @@ function buildIcons(){
   people.forEach(p=>{p.clones=[];const n=PAGE.cloneCount?PAGE.cloneCount(p):0;
     for(let i=0;i<n;i++){const c={parent:p,el:makeIcon(p,'clone')};p.clones.push(c);items.push(c);gPeople.appendChild(c.el)}});
   people.forEach(p=>{p.el=makeIcon(p);items.push(p);gPeople.appendChild(p.el)});
+  refreshEsrd();
 }
+const hasEsrd=p=>p.u<riskOf(p);
+function refreshEsrd(){items.forEach(it=>it.el.classList.toggle('esrd',hasEsrd(it.parent||it)))}
+// Positions are tweened in JS and written to the SVG transform attribute,
+// so icons, link lines and pair boxes share one coordinate system in every browser.
+const DUR=950,FADE=600,reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let raf=0;
+const ease=k=>k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+function drawItem(it){const c=it.cur;
+  it.el.setAttribute('transform',`translate(${c.x.toFixed(2)} ${c.y.toFixed(2)}) scale(${c.s.toFixed(3)})`);
+  it.el.setAttribute('opacity',c.o.toFixed(3))}
 function applyLayout(L,instant){
-  const svg=$('stage');
-  if(instant)svg.classList.add('noanim');
+  const now=performance.now();
   items.forEach(it=>{
     const q=L.get(it)||(it.parent?{...L.get(it.parent),o:0,delay:0}:{x:W/2,y:H/2,s:1,o:0});
-    const el=it.el;
-    el.style.transitionDelay=(q.delay||0)+'ms';
-    el.style.transform=`translate(${q.x.toFixed(1)}px,${q.y.toFixed(1)}px) scale(${q.s.toFixed(3)})`;
-    el.style.opacity=q.o;
-    el.style.pointerEvents=q.o<.05?'none':'';
+    const to={x:q.x,y:q.y,s:q.s,o:q.o};
+    if(instant||reduceMotion||!it.cur){it.cur={...to};it.from={...to};it.to=to;it.t0=now;drawItem(it)}
+    else{it.from={...it.cur};it.to=to;it.t0=now+(q.delay||0)}
+    it.el.style.pointerEvents=q.o<.05?'none':'';
   });
-  if(instant){svg.getBoundingClientRect();requestAnimationFrame(()=>requestAnimationFrame(()=>svg.classList.remove('noanim')))}
+  if(!raf)raf=requestAnimationFrame(tick);
+}
+function tick(now){
+  let busy=false;
+  items.forEach(it=>{
+    const k=clamp((now-it.t0)/DUR,0,1),ko=clamp((now-it.t0)/FADE,0,1),e=ease(k),f=it.from,t=it.to;
+    if(k<1)busy=true;
+    it.cur={x:f.x+(t.x-f.x)*e,y:f.y+(t.y-f.y)*e,s:f.s+(t.s-f.s)*e,o:f.o+(t.o-f.o)*ko};
+    drawItem(it);
+  });
+  raf=busy?requestAnimationFrame(tick):0;
 }
 
 // Layout: two groups side by side, sorted by BMI
@@ -294,7 +314,7 @@ document.addEventListener('keydown',e=>{
   if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();go(S.step-1)}
 });
 ['rr1','rr2'].forEach(id=>$(id).addEventListener('click',()=>{
-  S.rr=id==='rr1'?1:2;$('rr1').setAttribute('aria-pressed',S.rr===1);$('rr2').setAttribute('aria-pressed',S.rr===2);PAGE.cards()}));
+  S.rr=id==='rr1'?1:2;refreshEsrd();$('rr1').setAttribute('aria-pressed',S.rr===1);$('rr2').setAttribute('aria-pressed',S.rr===2);PAGE.cards()}));
 $('resample').addEventListener('click',()=>{S.seed++;generate();render(true,true)});
 
 let caliper=0.05,method=location.hash==='#ipw'?'ipw':'psm';
@@ -352,7 +372,7 @@ function ipwLayout(step){
 }
 const PAGE={
   cloneCount:p=>Math.max(0,Math.round(p.w)-1),
-  tip:p=>`BMI    ${p.bmi.toFixed(1)}\nAge    ${Math.round(p.age)}\nPS     ${p.ps.toFixed(2)}`+(method==='ipw'?`\nWeight ${p.w.toFixed(1)}`:''),
+  tip:p=>`BMI    ${p.bmi.toFixed(1)}\nAge    ${Math.round(p.age)}\nPS     ${p.ps.toFixed(2)}`+(method==='ipw'?`\nWeight ${p.w.toFixed(1)}`:'')+`\nESRD   ${hasEsrd(p)?'yes':'no'}`,
   layout:step=>method==='psm'?psmLayout(step):ipwLayout(step),
   cards(){
     const T=people.filter(p=>p.pe),C=people.filter(p=>!p.pe),on=S.step>=2;
