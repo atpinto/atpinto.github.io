@@ -639,12 +639,61 @@
     };
   }
 
+
+  function makePropensity() {
+    const rand = mulberry32(19);
+    const dots = Array.from({ length: 34 }, function () {
+      const z = randn(rand), pe = rand() < 1 / (1 + Math.exp(-(-0.9 + 1.4 * z)));
+      return { ps: 1 / (1 + Math.exp(-(-0.9 + 1.4 * z))), pe: pe };
+    });
+    const cases = dots.filter(function (d) { return d.pe; }), ctr = dots.filter(function (d) { return !d.pe; });
+    const used = new Set();
+    cases.sort(function (a, b) { return b.ps - a.ps; }).forEach(function (c) {
+      let best = null, bd = 0.08;
+      ctr.forEach(function (d) { if (!used.has(d) && Math.abs(d.ps - c.ps) < bd) { bd = Math.abs(d.ps - c.ps); best = d; } });
+      if (best) { c.m = best; used.add(best); }
+    });
+    let t = 0;
+    return {
+      reset: function () { t = 0; },
+      tick: function (dt, intensity) { t += dt * 0.35 * intensity; },
+      draw: function (ctx, p, w, h) {
+        clear(ctx, p, w, h);
+        const phase = t % 2, k = phase % 1, weighting = phase >= 1;
+        const ease = 0.5 - 0.5 * Math.cos(Math.min(1, k * 1.6) * Math.PI);
+        const x = function (v) { return 20 + v * (w - 40); }, mid = h / 2;
+        ctx.strokeStyle = p.rule; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x(0), mid); ctx.lineTo(x(1), mid); ctx.stroke();
+        const stack = {};
+        dots.forEach(function (d) {
+          const b = (d.pe ? "t" : "c") + Math.floor(d.ps * 24);
+          d.i = stack[b] = (stack[b] || 0) + 1;
+          d.x = x((Math.floor(d.ps * 24) + 0.5) / 24);
+          d.y = d.pe ? mid - 6 - d.i * 11 : mid + 6 + d.i * 11;
+        });
+        if (!weighting) {
+          ctx.strokeStyle = hexAlpha(p.muted, 0.7); ctx.lineWidth = 1.2;
+          cases.forEach(function (c) { if (!c.m) return;
+            ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + (c.m.x - c.x) * ease, c.y + (c.m.y - c.y) * ease); ctx.stroke(); });
+        }
+        dots.forEach(function (d) {
+          const wgt = d.pe ? 1 / d.ps : 1 / (1 - d.ps);
+          const r = weighting ? 3.2 * (1 + (Math.min(2.6, Math.sqrt(wgt)) - 1) * ease) : 3.2;
+          const faded = !weighting && ease > 0.5 && !(d.m || used.has(d));
+          ctx.fillStyle = hexAlpha(d.pe ? p.sample : p.model, faded ? 0.25 : 0.9);
+          ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, Math.PI * 2); ctx.fill();
+        });
+      },
+    };
+  }
+
   const factories = {
     competing: makeCompeting,
     hazard: makeHazard,
     nn: makeNN, mcmc: makeMh("card"), nlin: makeNlin, corr: makeCorr, contbin: makeContBin,
     dummy: makeDummy, rand: makeRand, power: makePower, clt: makeClt, galton: makeGalton,
     monty: makeMonty, ht: makeHt, roc: makeRoc, km: makeKm, km2: makeKm, lmm: makeLmm,
+    propensity: makePropensity,
   };
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

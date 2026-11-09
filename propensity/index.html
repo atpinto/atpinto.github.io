@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Propensity score methods</title>
+<meta name="description" content="Step through propensity score matching and inverse probability weighting on a simulated preeclampsia and ESRD example.">
+<link rel="icon" href="../assets/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: lecture stage — step bar on top, one wide animated SVG stage, three live readout cards beneath */
+:root{
+  --bg:#EDF0F4; --surface:#FFFFFF; --ink:#172031; --muted:#5B6576; --faint:#C6CED9; --grid:#E4E8EE;
+  --pe:#D6431B; --ctl:#2B67AC; --pair:#F1F4F8;
+  --f-display:"Bricolage Grotesque","Avenir Next",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E131A; --surface:#161D27; --ink:#E6EBF2; --muted:#94A0B1; --faint:#3A4555; --grid:#222B37;
+  --pe:#FF7247; --ctl:#6BA6EC; --pair:#1E2733; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E131A; --surface:#161D27; --ink:#E6EBF2; --muted:#94A0B1; --faint:#3A4555; --grid:#222B37;
+  --pe:#FF7247; --ctl:#6BA6EC; --pair:#1E2733; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.4}
+.wrap{max-width:1200px;margin:0 auto;padding-block:18px 28px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--f-display);font-weight:800;font-size:clamp(1.6rem,3.2vw,2.4rem);letter-spacing:-.015em;margin:0;line-height:1.05;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;font-size:1.02rem}
+.sub b{font-weight:700}
+.sub .pe{color:var(--pe)} .sub .ctlc{color:var(--ink)}
+.legend{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.9rem}
+.legend svg{height:34px;width:auto}
+.lg{fill:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+.steps{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.chip,.nav,.btn,.seg button{font:700 .95rem var(--f-body);cursor:pointer;color:var(--muted);background:var(--surface);border:1px solid var(--faint)}
+.chip{padding:8px 14px 8px 10px;border-radius:999px;display:flex;gap:8px;align-items:center}
+.chip .n{font:500 .78rem var(--f-mono);width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1px solid currentColor}
+.chip[aria-current="step"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.done{color:var(--ink)}
+.nav{width:40px;height:40px;border-radius:50%;font-size:1.3rem;line-height:1;display:grid;place-items:center}
+.nav:disabled{opacity:.35;cursor:default}
+.ctrls{display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap}
+.ctl{display:flex;gap:8px;align-items:center;font-size:.9rem;color:var(--muted);font-weight:700}
+.ctl output{font:500 .85rem var(--f-mono);color:var(--ink);min-width:2.6em}
+input[type=range]{accent-color:var(--ink);width:120px}
+.seg{display:inline-flex;border:1px solid var(--faint);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:6px 12px;font-size:.88rem;background:transparent}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.btn{padding:7px 14px;border-radius:999px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--ctl);outline-offset:2px}
+.stage{background:var(--surface);border-radius:16px;border:1px solid var(--grid);overflow:hidden}
+.stage svg{display:block;width:100%;height:auto}
+.person{transition:transform .95s cubic-bezier(.65,0,.25,1),opacity .6s ease}
+.person.pe{fill:var(--pe)} .person.ctl{fill:var(--ctl)}
+.person.clone{fill-opacity:.4}
+.noanim .person{transition:none!important}
+.enter > *{animation:fadein .55s .45s both}
+@keyframes fadein{from{opacity:0}}
+.grid{stroke:var(--grid);stroke-width:1.2}
+.axis{stroke:var(--faint);stroke-width:2}
+.tick{font:500 13px var(--f-mono);fill:var(--muted)}
+.axt{font:700 15px var(--f-body);fill:var(--muted)}
+.glbl{font:800 22px var(--f-display)}
+.glbl.pe{fill:var(--pe)} .glbl.ctl{fill:var(--ctl)}
+.gn{font:500 15px var(--f-mono);fill:var(--muted)}
+.wf{font:500 16px var(--f-mono);fill:var(--ink)}
+.link{stroke:var(--muted);stroke-width:1.4;opacity:.6}
+.pairbox{fill:var(--pair)}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:780px){.cards{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--grid);border-radius:16px;padding:12px 16px 8px;min-width:0}
+.card h2{font:700 .78rem var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 2px;display:flex;justify-content:space-between;gap:8px}
+.key{display:flex;gap:10px;align-items:center;letter-spacing:.04em}
+.key i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:0}
+.key .kp{background:var(--pe)} .key .kc{background:var(--ctl)}
+.card svg{width:100%;height:auto;display:block}
+.rl{font:700 12px var(--f-body);fill:var(--muted);letter-spacing:.03em}
+.db{stroke:var(--faint);stroke-width:5;stroke-linecap:round}
+.dpe{fill:var(--pe)} .dctl{fill:var(--ctl)} .rrdot{fill:var(--ink)}
+.val{font:500 13px var(--f-mono);fill:var(--ink)}
+.truth{stroke:var(--ink);stroke-dasharray:4 4;stroke-width:1.5}
+.tl{font:700 11px var(--f-body);fill:var(--ink);letter-spacing:.05em}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font:500 .8rem/1.45 var(--f-mono);padding:6px 10px;border-radius:8px;white-space:pre;z-index:5}
+@media (prefers-reduced-motion:reduce){.person{transition:none!important}.enter > *{animation:none}}
+
+body{margin:0}
+[hidden]{display:none!important}
+.hright{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.seg.big button{padding:9px 18px;font-size:1rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1 id="h1">Propensity score matching</h1><p class="sub">Does <b class="pe">preeclampsia</b> raise the risk of <b>ESRD</b>? Confounders: BMI, age</p></div>
+    <div class="hright">
+      <span class="seg big" role="group" aria-label="Method"><button id="m-psm" type="button" aria-pressed="true">Matching</button><button id="m-ipw" type="button" aria-pressed="false">IPW</button></span>
+      <div class="legend" aria-label="Body width shows BMI"><svg viewBox="0 0 96 34" aria-hidden="true"><g class="lg" transform="translate(12 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="3" ry="9"/></g><path d="M26 20h22m-5-4 5 4-5 4" stroke="currentColor" fill="none" stroke-width="1.6"/><g class="lg" transform="translate(66 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="9" ry="9"/></g></svg>BMI</div>
+    </div>
+  </header>
+  <div class="bar">
+    <nav class="steps" aria-label="Steps">
+      <button class="nav" id="prev" aria-label="Previous step">‹</button>
+      <button class="chip" type="button"><span class="n">1</span><span class="lab">Groups</span></button>
+      <button class="chip" type="button"><span class="n">2</span><span class="lab">Score</span></button>
+      <button class="chip" type="button"><span class="n">3</span><span class="lab">Match</span></button>
+      <button class="chip" type="button"><span class="n">4</span><span class="lab">Compare</span></button>
+      <button class="nav" id="next" aria-label="Next step">›</button>
+    </nav>
+    <div class="ctrls">
+      <label class="ctl" for="caliper" id="calctl">Caliper <input type="range" id="caliper" min="0.01" max="0.3" step="0.01" value="0.05"><output id="calv">0.05</output></label>
+      <span class="ctl" id="pairctl"><output id="npairs" style="min-width:auto">–</output></span>
+      <span class="ctl">True effect <span class="seg" role="group" aria-label="True effect of preeclampsia"><button id="rr1" type="button" aria-pressed="true">None</button><button id="rr2" type="button" aria-pressed="false">×2 risk</button></span></span><button class="btn" id="resample" type="button">↻ New sample</button>
+    </div>
+  </div>
+  <div class="stage"><svg id="stage" viewBox="0 0 960 460" role="img" aria-label="Women with and without preeclampsia, arranged by step"><g id="g-under"></g><g id="g-people"></g><g id="g-over"></g></svg></div>
+  <section class="cards"><div class="card"><h2>Mean BMI <span class="key"><span><i class="kp"></i>PE</span><span><i class="kc"></i>No PE</span></span></h2><svg id="c-bmi" viewBox="0 0 320 110"></svg></div><div class="card"><h2>Mean age</h2><svg id="c-age" viewBox="0 0 320 110"></svg></div><div class="card"><h2>Risk ratio · ESRD</h2><svg id="c-rr" viewBox="0 0 320 110"></svg></div></section>
+</div>
+<div class="tip" id="tip" hidden></div>
+<script>
+const NS="http://www.w3.org/2000/svg";
+const W=960,H=460,X0=70,X1=900,BIN=0.025;
+let AX=210;
+const S={step:0,rr:1,seed:4};
+let people=[],items=[];
+const $=id=>document.getElementById(id);
+const gUnder=$('g-under'),gPeople=$('g-people'),gOver=$('g-over'),tip=$('tip');
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const expit=z=>1/(1+Math.exp(-z));
+const px=ps=>X0+ps*(X1-X0);
+const mean=(a,f)=>a.length?a.reduce((s,p)=>s+f(p),0)/a.length:NaN;
+const wmean=(a,f,w)=>{let s=0,t=0;a.forEach(p=>{s+=w(p)*f(p);t+=w(p)});return t?s/t:NaN};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function normal(r){let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r())}
+// Toy outcome model: ESRD risk rises with BMI and age; preeclampsia multiplies it by S.rr
+function riskOf(p){return Math.min(.95,.04*Math.exp(.12*(p.bmi-27)+.05*(p.age-30))*(p.pe?S.rr:1))}
+
+function generate(){
+  for(let t=0;t<500;t++){
+    const r=mulberry32(S.seed*7919+t*31+1),arr=[];
+    for(let i=0;i<60;i++){
+      const bmi=clamp(27+5*normal(r),18,42),age=clamp(30+4.5*normal(r),18,44);
+      arr.push({id:i,bmi,age,pe:r()<expit(-1+0.28*(bmi-27)+0.12*(age-30))});
+    }
+    const n=arr.filter(p=>p.pe).length;
+    if(n>=15&&n<=22){people=arr;break}
+  }
+  fitPS();
+  people.forEach(p=>{p.w=p.pe?1/p.ps:1/(1-p.ps);p.match=null});
+  buildIcons();
+}
+// Logistic regression (Newton–Raphson): PE ~ BMI + age
+function fitPS(){
+  const X=people.map(p=>[1,(p.bmi-27)/5,(p.age-30)/5]),y=people.map(p=>p.pe?1:0);
+  let b=[0,0,0];
+  for(let it=0;it<30;it++){
+    const g=[0,0,0],M=[[1e-3,0,0],[0,1e-3,0],[0,0,1e-3]];
+    X.forEach((x,i)=>{const p=expit(x[0]*b[0]+x[1]*b[1]+x[2]*b[2]),w=p*(1-p);
+      for(let j=0;j<3;j++){g[j]+=x[j]*(y[i]-p);for(let k=0;k<3;k++)M[j][k]+=w*x[j]*x[k]}});
+    for(let j=0;j<3;j++)g[j]-=1e-3*b[j];
+    const d=solve3(M,g);b=b.map((v,j)=>v+d[j]);
+  }
+  people.forEach((p,i)=>{const x=X[i];p.ps=clamp(expit(x[0]*b[0]+x[1]*b[1]+x[2]*b[2]),.01,.99)});
+}
+function solve3(A,v){
+  const M=A.map((r,i)=>[...r,v[i]]);
+  for(let c=0;c<3;c++){let p=c;for(let r=c+1;r<3;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;
+    [M[c],M[p]]=[M[p],M[c]];
+    for(let r=0;r<3;r++){if(r===c)continue;const f=M[r][c]/M[c][c];for(let k=c;k<4;k++)M[r][k]-=f*M[c][k]}}
+  return M.map((r,i)=>r[3]/r[i]);
+}
+
+function makeIcon(p,cls){
+  const g=document.createElementNS(NS,'g');
+  g.setAttribute('class','person '+(p.pe?'pe':'ctl')+(cls?' '+cls:''));
+  const rx=2.6+(p.bmi-18)*0.27; // body width encodes BMI
+  g.innerHTML=`<circle cx="0" cy="-11" r="4.4"/><ellipse cx="0" cy="4" rx="${rx.toFixed(2)}" ry="9"/>`;
+  g.addEventListener('pointerenter',e=>{tip.textContent=PAGE.tip(p);tip.hidden=false;moveTip(e)});
+  g.addEventListener('pointermove',moveTip);
+  g.addEventListener('pointerleave',()=>{tip.hidden=true});
+  return g;
+}
+function moveTip(e){tip.style.left=Math.min(innerWidth-160,e.clientX+16)+'px';tip.style.top=(e.clientY+16)+'px'}
+function buildIcons(){
+  gPeople.innerHTML='';items=[];
+  people.forEach(p=>{p.clones=[];const n=PAGE.cloneCount?PAGE.cloneCount(p):0;
+    for(let i=0;i<n;i++){const c={parent:p,el:makeIcon(p,'clone')};p.clones.push(c);items.push(c);gPeople.appendChild(c.el)}});
+  people.forEach(p=>{p.el=makeIcon(p);items.push(p);gPeople.appendChild(p.el)});
+}
+function applyLayout(L,instant){
+  const svg=$('stage');
+  if(instant)svg.classList.add('noanim');
+  items.forEach(it=>{
+    const q=L.get(it)||(it.parent?{...L.get(it.parent),o:0,delay:0}:{x:W/2,y:H/2,s:1,o:0});
+    const el=it.el;
+    el.style.transitionDelay=(q.delay||0)+'ms';
+    el.style.transform=`translate(${q.x.toFixed(1)}px,${q.y.toFixed(1)}px) scale(${q.s.toFixed(3)})`;
+    el.style.opacity=q.o;
+    el.style.pointerEvents=q.o<.05?'none':'';
+  });
+  if(instant){svg.getBoundingClientRect();requestAnimationFrame(()=>requestAnimationFrame(()=>svg.classList.remove('noanim')))}
+}
+
+// Layout: two groups side by side, sorted by BMI
+function layoutGroups(){
+  const L=new Map();let over='';
+  [[true,240],[false,720]].forEach(([pe,cx])=>{
+    const g=people.filter(p=>p.pe===pe).sort((a,b)=>a.bmi-b.bmi);
+    const cols=pe?6:10,cw=40,ch=52,rows=Math.ceil(g.length/cols);
+    const top=235-(rows-1)*ch/2,left=cx-(cols-1)*cw/2;
+    g.forEach((p,i)=>L.set(p,{x:left+(i%cols)*cw,y:top+Math.floor(i/cols)*ch,s:1.3,o:1}));
+    over+=`<text class="glbl ${pe?'pe':'ctl'}" x="${cx}" y="${top-52}" text-anchor="middle">${pe?'Preeclampsia':'No preeclampsia'} <tspan class="gn">n=${g.length}</tspan></text>`;
+  });
+  return {L,over};
+}
+// Layout: everyone on the propensity-score axis; kf(p) = relative icon size
+function layoutScore(kf){
+  const L=new Map(),bins={},k=p=>kf?kf(p):1;
+  people.forEach(p=>{const key=(p.pe?'t':'c')+Math.min(39,Math.floor(p.ps/BIN));(bins[key]=bins[key]||[]).push(p)});
+  let up=1,dn=1;
+  for(const[key,a]of Object.entries(bins)){const sum=a.reduce((s,p)=>s+k(p)*30,0);if(key[0]==='t')up=Math.max(up,sum);else dn=Math.max(dn,sum)}
+  AX=clamp(44+(H-108)*up/(up+dn),130,260); // give more room to the taller side
+  const s0=Math.min(1.05,(AX-44)/up,(H-AX-64)/dn);
+  for(const[key,a]of Object.entries(bins)){
+    const isT=key[0]==='t',x=X0+(+key.slice(1)+.5)*BIN*(X1-X0);
+    a.sort((p,q)=>p.ps-q.ps);let off=7;
+    a.forEach(p=>{const s=s0*k(p);
+      L.set(p,{x,y:isT?AX-off-13*s:AX+off+15.4*s,s,o:1});off+=30*s});
+  }
+  return {L};
+}
+function axisSVG(){
+  let s='';
+  [0,.25,.5,.75,1].forEach(v=>{const x=px(v);
+    s+=`<line class="grid" x1="${x}" x2="${x}" y1="28" y2="${H-56}"/><text class="tick" x="${x}" y="${H-36}" text-anchor="middle">${v}</text>`});
+  s+=`<line class="axis" x1="${X0}" x2="${X1}" y1="${AX}" y2="${AX}"/>`;
+  s+=`<text class="axt" x="${(X0+X1)/2}" y="${H-12}" text-anchor="middle">Propensity score = P(preeclampsia | BMI, age)</text>`;
+  return s;
+}
+function sideLabels(extraT,extraC){
+  return `<text class="glbl pe" x="${X0}" y="40">Preeclampsia${extraT?` <tspan class="wf" dx="8">${extraT}</tspan>`:''}</text>`+
+    `<text class="glbl ctl" x="${X1}" y="${H-66}" text-anchor="end">No preeclampsia${extraC?` <tspan class="wf" dx="8">${extraC}</tspan>`:''}</text>`;
+}
+
+// Readout cards
+function dumbbell(el,rows,lo,hi,ticks){
+  const xa=78,xb=262,sx=v=>xa+(clamp(v,lo,hi)-lo)/(hi-lo)*(xb-xa);let s='';
+  ticks.forEach(t=>{s+=`<line class="grid" x1="${sx(t)}" x2="${sx(t)}" y1="12" y2="84"/><text class="tick" x="${sx(t)}" y="103" text-anchor="middle">${t}</text>`});
+  rows.forEach((r,i)=>{const y=30+i*36;
+    s+=`<g opacity="${r.on?1:.15}"><text class="rl" x="0" y="${y+4}">${r.label}</text>`;
+    if(isFinite(r.a)&&isFinite(r.b))s+=`<line class="db" x1="${sx(r.a)}" x2="${sx(r.b)}" y1="${y}" y2="${y}"/><circle class="dctl" cx="${sx(r.b)}" cy="${y}" r="7"/><circle class="dpe" cx="${sx(r.a)}" cy="${y}" r="7"/><text class="val" x="320" y="${y+4}" text-anchor="end">Δ${Math.abs(r.a-r.b).toFixed(1)}</text>`;
+    s+='</g>'});
+  el.innerHTML=s;
+}
+function rrPlot(el,rows,truth){
+  const lo=Math.log(.5),hi=Math.log(4),xa=78,xb=262,sx=v=>xa+(clamp(Math.log(v),lo,hi)-lo)/(hi-lo)*(xb-xa);let s='';
+  [.5,1,2,4].forEach(t=>{s+=`<line class="grid" x1="${sx(t)}" x2="${sx(t)}" y1="12" y2="84"/><text class="tick" x="${sx(t)}" y="103" text-anchor="middle">${t}</text>`});
+  s+=`<line class="truth" x1="${sx(truth)}" x2="${sx(truth)}" y1="10" y2="86"/><text class="tl" x="${sx(truth)+5}" y="12">TRUE</text>`;
+  rows.forEach((r,i)=>{const y=30+i*36;
+    s+=`<g opacity="${r.on?1:.15}"><text class="rl" x="0" y="${y+4}">${r.label}</text>`;
+    if(isFinite(r.v))s+=`<circle class="rrdot" cx="${sx(r.v)}" cy="${y}" r="7"/><text class="val" x="320" y="${y+4}" text-anchor="end">${r.v.toFixed(2)}</text>`;
+    s+='</g>'});
+  el.innerHTML=s;
+}
+
+// Navigation and controls
+const chips=[...document.querySelectorAll('.chip')];
+function render(stepChanged,instant){
+  const r=PAGE.layout(S.step);
+  applyLayout(r.L,instant);
+  [gUnder,gOver].forEach(g=>g.classList.toggle('enter',!!stepChanged));
+  gUnder.innerHTML=r.under||'';gOver.innerHTML=r.over||'';
+  PAGE.cards();
+}
+function go(step,instant){
+  S.step=clamp(step,0,chips.length-1);
+  chips.forEach((c,i)=>{c.toggleAttribute('aria-current',false);if(i===S.step)c.setAttribute('aria-current','step');c.classList.toggle('done',i<S.step)});
+  $('prev').disabled=S.step===0;$('next').disabled=S.step===chips.length-1;
+  render(true,instant);
+}
+chips.forEach((c,i)=>c.addEventListener('click',()=>go(i)));
+$('prev').addEventListener('click',()=>go(S.step-1));
+$('next').addEventListener('click',()=>go(S.step+1));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(['ArrowRight','PageDown'].includes(e.key)){e.preventDefault();go(S.step+1)}
+  if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();go(S.step-1)}
+});
+['rr1','rr2'].forEach(id=>$(id).addEventListener('click',()=>{
+  S.rr=id==='rr1'?1:2;$('rr1').setAttribute('aria-pressed',S.rr===1);$('rr2').setAttribute('aria-pressed',S.rr===2);PAGE.cards()}));
+$('resample').addEventListener('click',()=>{S.seed++;generate();render(true,true)});
+
+let caliper=0.05,method=location.hash==='#ipw'?'ipw':'psm';
+const LBL={psm:['Groups','Score','Match','Compare'],ipw:['Groups','Score','Weight','Pseudo-population']};
+function match(){
+  people.forEach(p=>p.match=null);
+  const ctr=people.filter(p=>!p.pe),used=new Set();
+  people.filter(p=>p.pe).sort((a,b)=>b.ps-a.ps).forEach(t=>{
+    let best=null,bd=Infinity;
+    ctr.forEach(c=>{if(!used.has(c)){const d=Math.abs(c.ps-t.ps);if(d<bd){bd=d;best=c}}});
+    if(best&&bd<=caliper+1e-9){t.match=best;best.match=t;used.add(best)}
+  });
+}
+function psmLayout(step){
+  match();
+  const T=people.filter(p=>p.pe),m=T.filter(p=>p.match).length;
+  $('npairs').textContent=`${m} pairs · ${T.length-m} unmatched`;
+  if(step===0)return layoutGroups();
+  const {L}=layoutScore();
+  if(step===1)return {L,under:axisSVG(),over:sideLabels()};
+  if(step===2){
+    let under=axisSVG();
+    people.forEach(p=>{if(!p.match)L.get(p).o=.15});
+    T.forEach(t=>{if(t.match){const a=L.get(t),b=L.get(t.match);
+      under+=`<line class="link" x1="${a.x}" y1="${a.y+13*a.s}" x2="${b.x}" y2="${b.y-15.4*b.s}"/>`}});
+    return {L,under,over:sideLabels()};
+  }
+  const pairs=T.filter(p=>p.match).sort((a,b)=>a.ps-b.ps);
+  const n=pairs.length,cols=Math.min(8,Math.max(1,n)),cw=106,ch=76,rows=Math.ceil(n/cols);
+  const left=W/2-(cols-1)*cw/2,top=H/2-(rows-1)*ch/2;
+  let under='';
+  people.forEach(p=>{L.get(p).o=0});
+  pairs.forEach((t,i)=>{const x=left+(i%cols)*cw,y=top+Math.floor(i/cols)*ch;
+    L.set(t,{x:x-15,y,s:1.3,o:1});L.set(t.match,{x:x+15,y,s:1.3,o:1});
+    under+=`<rect class="pairbox" x="${x-37}" y="${y-26}" width="74" height="50" rx="12"/>`});
+  return {L,under};
+}
+function ipwLayout(step){
+  if(step===0)return layoutGroups();
+  if(step===1)return {L:layoutScore().L,under:axisSVG(),over:sideLabels()};
+  if(step===2)return {L:layoutScore(p=>Math.min(3,Math.sqrt(p.w))).L,under:axisSVG(),over:sideLabels('× 1/PS','× 1/(1−PS)')};
+  // pseudo-population: each woman repeated about as many times as her weight
+  const L=new Map(),sides=[[true,240],[false,720]];
+  const lists=sides.map(([pe])=>{const a=[];people.filter(p=>p.pe===pe).sort((x,y)=>x.bmi-y.bmi).forEach(p=>{a.push(p);p.clones.forEach(c=>a.push(c))});return a});
+  const T=Math.max(...lists.map(a=>a.length)),AW=420,AH=H-110;
+  let h=46;
+  for(;h>12;h--){if(Math.floor(AW/(h*.72))*Math.floor(AH/h)>=T)break}
+  const cw=h*.72,cols=Math.floor(AW/cw),s=h/34;
+  let over='';
+  lists.forEach((a,si)=>{const [pe,cx]=sides[si],used=Math.min(cols,a.length),left=cx-(used-1)*cw/2,top=86+h/2;
+    a.forEach((it,i)=>L.set(it,{x:left+(i%cols)*cw,y:top+Math.floor(i/cols)*h,s,o:1,delay:it.parent?150+Math.min(700,i*7):0}));
+    const g=people.filter(p=>p.pe===pe),nw=g.reduce((t,p)=>t+p.w,0);
+    over+=`<text class="glbl ${pe?'pe':'ctl'}" x="${cx}" y="52" text-anchor="middle">${pe?'Preeclampsia':'No preeclampsia'} <tspan class="gn">n=${g.length} → ${Math.round(nw)}</tspan></text>`});
+  return {L,over};
+}
+const PAGE={
+  cloneCount:p=>Math.max(0,Math.round(p.w)-1),
+  tip:p=>`BMI    ${p.bmi.toFixed(1)}\nAge    ${Math.round(p.age)}\nPS     ${p.ps.toFixed(2)}`+(method==='ipw'?`\nWeight ${p.w.toFixed(1)}`:''),
+  layout:step=>method==='psm'?psmLayout(step):ipwLayout(step),
+  cards(){
+    const T=people.filter(p=>p.pe),C=people.filter(p=>!p.pe),on=S.step>=2;
+    let a2,lab,est;
+    if(method==='psm'){
+      const MT=T.filter(p=>p.match),MC=MT.map(p=>p.match);
+      a2=f=>[mean(MT,f),mean(MC,f)];lab='Matched';est=mean(MT,riskOf)/mean(MC,riskOf);
+    }else{
+      const w=p=>p.w;a2=f=>[wmean(T,f,w),wmean(C,f,w)];lab='Weighted';est=wmean(T,riskOf,w)/wmean(C,riskOf,w);
+    }
+    const row=(f,label)=>{const [a,b]=a2(f);return {label,a,b,on}};
+    dumbbell($('c-bmi'),[{label:'All',a:mean(T,p=>p.bmi),b:mean(C,p=>p.bmi),on:true},row(p=>p.bmi,lab)],20,36,[20,24,28,32,36]);
+    dumbbell($('c-age'),[{label:'All',a:mean(T,p=>p.age),b:mean(C,p=>p.age),on:true},row(p=>p.age,lab)],24,36,[24,28,32,36]);
+    rrPlot($('c-rr'),[{label:'Crude',v:mean(T,riskOf)/mean(C,riskOf),on:true},{label:method==='psm'?'Matched':'IPW',v:est,on}],S.rr);
+  }
+};
+function setMethod(m,silent){
+  method=m;
+  $('m-psm').setAttribute('aria-pressed',m==='psm');$('m-ipw').setAttribute('aria-pressed',m==='ipw');
+  $('h1').textContent=m==='psm'?'Propensity score matching':'Inverse probability weighting';
+  document.querySelectorAll('.chip .lab').forEach((el,i)=>el.textContent=LBL[m][i]);
+  $('calctl').hidden=$('pairctl').hidden=m!=='psm';
+  try{history.replaceState(null,'','#'+m)}catch(e){}
+  if(!silent)render(true);
+}
+$('m-psm').addEventListener('click',()=>setMethod('psm'));
+$('m-ipw').addEventListener('click',()=>setMethod('ipw'));
+$('caliper').addEventListener('input',e=>{caliper=+e.target.value;$('calv').textContent=caliper.toFixed(2);render(false)});
+setMethod(method,true);
+generate();go(0,true);
+</script>
+</body>
+</html>
