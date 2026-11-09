@@ -59,8 +59,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ctl);outline-of
 .stage svg{display:block;width:100%;height:auto}
 .person.pe{fill:var(--pe)} .person.ctl{fill:var(--ctl)}
 .person.clone{fill-opacity:.4}
-.badge{fill:var(--ink);fill-opacity:1;stroke:var(--surface);stroke-width:1.6}
-.person:not(.esrd) .badge{display:none}
+.badge{fill:var(--ink);fill-opacity:1;stroke:var(--surface);stroke-width:.9}
+.person:not(.esrd) .badge,.hide-esrd .badge{display:none}
 .enter > *{animation:fadein .5s .85s both}
 @keyframes fadein{from{opacity:0}}
 .grid{stroke:var(--grid);stroke-width:1.2}
@@ -94,15 +94,25 @@ body{margin:0}
 [hidden]{display:none!important}
 .hright{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .seg.big button{padding:9px 18px;font-size:1rem}
+.languages{display:flex;gap:4px}
+.lang{padding:5px;border:1px solid transparent;border-radius:6px;background:transparent;line-height:0;opacity:.5;cursor:pointer}
+.lang:hover{opacity:1}
+.lang[aria-pressed="true"]{opacity:1;border-color:var(--faint)}
+.lang svg{width:30px;height:20px;border-radius:2px;box-shadow:0 0 0 1px rgba(23,32,49,.18)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div><h1 id="h1">Propensity score matching</h1><p class="sub">Does <b class="pe">preeclampsia</b> raise the risk of <b>ESRD</b>? Confounders: BMI, age</p></div>
+    <div><h1 id="h1">Propensity score matching</h1><p class="sub" id="sub">Does <b class="pe">preeclampsia</b> raise the risk of <b>ESRD</b>? Confounders: BMI, age</p></div>
     <div class="hright">
+      <span class="languages" role="group" aria-label="Language">
+        <button type="button" class="lang" data-lang="en" lang="en" aria-label="English" title="English"><svg viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><clipPath id="uk-cross"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><path d="M0 0h60v30H0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" clip-path="url(#uk-cross)" stroke="#c8102e" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></svg></button>
+        <button type="button" class="lang" data-lang="es" lang="es" aria-label="Español" title="Español"><svg viewBox="0 0 3 2" aria-hidden="true"><path d="M0 0h3v2H0z" fill="#aa151b"/><path d="M0 .5h3v1H0z" fill="#f1bf00"/></svg></button>
+        <button type="button" class="lang" data-lang="pt" lang="pt" aria-label="Português" title="Português"><svg viewBox="0 0 600 400" aria-hidden="true"><path d="M0 0h600v400H0z" fill="#da291c"/><path d="M0 0h240v400H0z" fill="#046a38"/><circle cx="240" cy="200" r="80" fill="none" stroke="#ffe900" stroke-width="18"/><path d="M205 150h70v60a35 35 0 0 1-70 0z" fill="#fff" stroke="#da291c" stroke-width="12"/></svg></button>
+      </span>
       <span class="seg big" role="group" aria-label="Method"><button id="m-psm" type="button" aria-pressed="true">Matching</button><button id="m-ipw" type="button" aria-pressed="false">IPW</button></span>
-      <div class="legend" aria-label="Body width shows BMI"><svg viewBox="0 0 96 34" aria-hidden="true"><g class="lg" transform="translate(12 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="3" ry="9"/></g><path d="M26 20h22m-5-4 5 4-5 4" stroke="currentColor" fill="none" stroke-width="1.6"/><g class="lg" transform="translate(66 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="9" ry="9"/></g></svg>BMI<svg viewBox="0 0 30 34" aria-hidden="true" style="margin-left:10px"><g class="lg" transform="translate(13 19)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="6" ry="9"/><circle class="badge" cx="5.6" cy="-15.6" r="3.8" style="stroke:var(--bg)"/></g></svg>ESRD</div>
+      <div class="legend" aria-label="Body width shows BMI"><svg viewBox="0 0 96 34" aria-hidden="true"><g class="lg" transform="translate(12 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="3" ry="9"/></g><path d="M26 20h22m-5-4 5 4-5 4" stroke="currentColor" fill="none" stroke-width="1.6"/><g class="lg" transform="translate(66 18)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="9" ry="9"/></g></svg><span data-i18n="bmi">BMI</span><svg viewBox="0 0 30 34" aria-hidden="true" style="margin-left:10px"><g class="lg" transform="translate(13 19)"><circle cy="-11" r="4.4"/><ellipse cy="4" rx="6" ry="9"/><path class="badge" transform="translate(3 -24.5) scale(1.2)" d="M4.6 0C2 0 0 2.2 0 5s2 5 4.6 5C6.6 10 8 8.8 8 7.4 8 6.2 6.4 6 6.4 5S8 3.8 8 2.6C8 1.2 6.6 0 4.6 0z" style="stroke:var(--bg)"/></g></svg><span data-i18n="esrd">ESRD</span></div>
     </div>
   </header>
   <div class="bar">
@@ -115,19 +125,21 @@ body{margin:0}
       <button class="nav" id="next" aria-label="Next step">›</button>
     </nav>
     <div class="ctrls">
-      <label class="ctl" for="caliper" id="calctl">Caliper <input type="range" id="caliper" min="0.01" max="0.3" step="0.01" value="0.05"><output id="calv">0.05</output></label>
+      <label class="ctl" for="caliper" id="calctl"><span id="callab">Caliper</span> <input type="range" id="caliper" min="0.01" max="0.3" step="0.01" value="0.05"><output id="calv">0.05</output></label>
       <span class="ctl" id="pairctl"><output id="npairs" style="min-width:auto">–</output></span>
-      <span class="ctl">True effect <span class="seg" role="group" aria-label="True effect of preeclampsia"><button id="rr1" type="button" aria-pressed="true">None</button><button id="rr2" type="button" aria-pressed="false">×2 risk</button></span></span><button class="btn" id="resample" type="button">↻ New sample</button>
+      <span class="ctl"><span data-i18n="trueEffect">True effect</span> <span class="seg" role="group" aria-label="True effect of preeclampsia"><button id="rr1" type="button" aria-pressed="true" data-i18n="none">None</button><button id="rr2" type="button" aria-pressed="false" data-i18n="x2">×2 risk</button></span></span><label class="ctl" for="showEsrd"><input type="checkbox" id="showEsrd" checked> <span data-i18n="showEsrd">Show ESRD</span></label><button class="btn" id="resample" type="button">↻ <span data-i18n="newSample">New sample</span></button>
     </div>
   </div>
   <div class="stage"><svg id="stage" viewBox="0 0 960 460" role="img" aria-label="Women with and without preeclampsia, arranged by step"><g id="g-under"></g><g id="g-people"></g><g id="g-over"></g></svg></div>
-  <section class="cards"><div class="card"><h2>Mean BMI <span class="key"><span><i class="kp"></i>PE</span><span><i class="kc"></i>No PE</span></span></h2><svg id="c-bmi" viewBox="0 0 320 110"></svg></div><div class="card"><h2>Mean age</h2><svg id="c-age" viewBox="0 0 320 110"></svg></div><div class="card"><h2>Risk ratio · ESRD</h2><svg id="c-rr" viewBox="0 0 320 110"></svg></div></section>
+  <section class="cards"><div class="card"><h2><span data-i18n="meanBmi">Mean BMI</span> <span class="key"><span><i class="kp"></i>PE</span><span><i class="kc"></i><span data-i18n="noPe">No PE</span></span></span></h2><svg id="c-bmi" viewBox="0 0 320 110"></svg></div><div class="card"><h2 data-i18n="meanAge">Mean age</h2><svg id="c-age" viewBox="0 0 320 110"></svg></div><div class="card"><h2 data-i18n="rrEsrd">Risk ratio · ESRD</h2><svg id="c-rr" viewBox="0 0 320 110"></svg></div></section>
 </div>
 <div class="tip" id="tip" hidden></div>
 <script>
 const NS="http://www.w3.org/2000/svg";
 const W=960,H=460,X0=70,X1=900,BIN=0.025;
 let AX=210;
+// Text drawn inside the SVGs; pages may replace these for other languages
+let TX={pe:'Preeclampsia',ctl:'No preeclampsia',axis:'Propensity score = P(preeclampsia | BMI, age)',truth:'TRUE'};
 const S={step:0,rr:1,seed:4};
 let people=[],items=[];
 const $=id=>document.getElementById(id);
@@ -182,7 +194,7 @@ function makeIcon(p,cls){
   const g=document.createElementNS(NS,'g');
   g.setAttribute('class','person '+(p.pe?'pe':'ctl')+(cls?' '+cls:''));
   const rx=2.6+(p.bmi-18)*0.27; // body width encodes BMI
-  g.innerHTML=`<circle cx="0" cy="-11" r="4.4"/><ellipse cx="0" cy="4" rx="${rx.toFixed(2)}" ry="9"/><circle class="badge" cx="5.6" cy="-15.6" r="3.8"/>`;
+  g.innerHTML=`<circle cx="0" cy="-11" r="4.4"/><ellipse cx="0" cy="4" rx="${rx.toFixed(2)}" ry="9"/><path class="badge" transform="translate(3 -24.5) scale(1.2)" d="M4.6 0C2 0 0 2.2 0 5s2 5 4.6 5C6.6 10 8 8.8 8 7.4 8 6.2 6.4 6 6.4 5S8 3.8 8 2.6C8 1.2 6.6 0 4.6 0z"/>`;
   g.addEventListener('pointerenter',e=>{tip.textContent=PAGE.tip(p);tip.hidden=false;moveTip(e)});
   g.addEventListener('pointermove',moveTip);
   g.addEventListener('pointerleave',()=>{tip.hidden=true});
@@ -236,7 +248,7 @@ function layoutGroups(){
     const cols=pe?6:10,cw=40,ch=52,rows=Math.ceil(g.length/cols);
     const top=235-(rows-1)*ch/2,left=cx-(cols-1)*cw/2;
     g.forEach((p,i)=>L.set(p,{x:left+(i%cols)*cw,y:top+Math.floor(i/cols)*ch,s:1.3,o:1}));
-    over+=`<text class="glbl ${pe?'pe':'ctl'}" x="${cx}" y="${top-52}" text-anchor="middle">${pe?'Preeclampsia':'No preeclampsia'} <tspan class="gn">n=${g.length}</tspan></text>`;
+    over+=`<text class="glbl ${pe?'pe':'ctl'}" x="${cx}" y="${top-52}" text-anchor="middle">${pe?TX.pe:TX.ctl} <tspan class="gn">n=${g.length}</tspan></text>`;
   });
   return {L,over};
 }
@@ -261,17 +273,17 @@ function axisSVG(){
   [0,.25,.5,.75,1].forEach(v=>{const x=px(v);
     s+=`<line class="grid" x1="${x}" x2="${x}" y1="28" y2="${H-56}"/><text class="tick" x="${x}" y="${H-36}" text-anchor="middle">${v}</text>`});
   s+=`<line class="axis" x1="${X0}" x2="${X1}" y1="${AX}" y2="${AX}"/>`;
-  s+=`<text class="axt" x="${(X0+X1)/2}" y="${H-12}" text-anchor="middle">Propensity score = P(preeclampsia | BMI, age)</text>`;
+  s+=`<text class="axt" x="${(X0+X1)/2}" y="${H-12}" text-anchor="middle">${TX.axis}</text>`;
   return s;
 }
 function sideLabels(extraT,extraC){
-  return `<text class="glbl pe" x="${X0}" y="40">Preeclampsia${extraT?` <tspan class="wf" dx="8">${extraT}</tspan>`:''}</text>`+
-    `<text class="glbl ctl" x="${X1}" y="${H-66}" text-anchor="end">No preeclampsia${extraC?` <tspan class="wf" dx="8">${extraC}</tspan>`:''}</text>`;
+  return `<text class="glbl pe" x="${X0}" y="40">${TX.pe}${extraT?` <tspan class="wf" dx="8">${extraT}</tspan>`:''}</text>`+
+    `<text class="glbl ctl" x="${X1}" y="${H-66}" text-anchor="end">${TX.ctl}${extraC?` <tspan class="wf" dx="8">${extraC}</tspan>`:''}</text>`;
 }
 
 // Readout cards
 function dumbbell(el,rows,lo,hi,ticks){
-  const xa=78,xb=262,sx=v=>xa+(clamp(v,lo,hi)-lo)/(hi-lo)*(xb-xa);let s='';
+  const xa=92,xb=264,sx=v=>xa+(clamp(v,lo,hi)-lo)/(hi-lo)*(xb-xa);let s='';
   ticks.forEach(t=>{s+=`<line class="grid" x1="${sx(t)}" x2="${sx(t)}" y1="12" y2="84"/><text class="tick" x="${sx(t)}" y="103" text-anchor="middle">${t}</text>`});
   rows.forEach((r,i)=>{const y=30+i*36;
     s+=`<g opacity="${r.on?1:.15}"><text class="rl" x="0" y="${y+4}">${r.label}</text>`;
@@ -280,9 +292,9 @@ function dumbbell(el,rows,lo,hi,ticks){
   el.innerHTML=s;
 }
 function rrPlot(el,rows,truth){
-  const lo=Math.log(.5),hi=Math.log(4),xa=78,xb=262,sx=v=>xa+(clamp(Math.log(v),lo,hi)-lo)/(hi-lo)*(xb-xa);let s='';
+  const lo=Math.log(.5),hi=Math.log(4),xa=92,xb=264,sx=v=>xa+(clamp(Math.log(v),lo,hi)-lo)/(hi-lo)*(xb-xa);let s='';
   [.5,1,2,4].forEach(t=>{s+=`<line class="grid" x1="${sx(t)}" x2="${sx(t)}" y1="12" y2="84"/><text class="tick" x="${sx(t)}" y="103" text-anchor="middle">${t}</text>`});
-  s+=`<line class="truth" x1="${sx(truth)}" x2="${sx(truth)}" y1="10" y2="86"/><text class="tl" x="${sx(truth)+5}" y="12">TRUE</text>`;
+  s+=`<line class="truth" x1="${sx(truth)}" x2="${sx(truth)}" y1="10" y2="86"/><text class="tl" x="${sx(truth)+5}" y="12">${TX.truth}</text>`;
   rows.forEach((r,i)=>{const y=30+i*36;
     s+=`<g opacity="${r.on?1:.15}"><text class="rl" x="0" y="${y+4}">${r.label}</text>`;
     if(isFinite(r.v))s+=`<circle class="rrdot" cx="${sx(r.v)}" cy="${y}" r="7"/><text class="val" x="320" y="${y+4}" text-anchor="end">${r.v.toFixed(2)}</text>`;
@@ -315,10 +327,48 @@ document.addEventListener('keydown',e=>{
 });
 ['rr1','rr2'].forEach(id=>$(id).addEventListener('click',()=>{
   S.rr=id==='rr1'?1:2;refreshEsrd();$('rr1').setAttribute('aria-pressed',S.rr===1);$('rr2').setAttribute('aria-pressed',S.rr===2);PAGE.cards()}));
+$('showEsrd').addEventListener('change',e=>$('stage').classList.toggle('hide-esrd',!e.target.checked));
 $('resample').addEventListener('click',()=>{S.seed++;generate();render(true,true)});
 
 let caliper=0.05,method=location.hash==='#ipw'?'ipw':'psm';
-const LBL={psm:['Groups','Score','Match','Compare'],ipw:['Groups','Score','Weight','Pseudo-population']};
+const I18N={
+ en:{title:'Propensity score methods',psm:'Propensity score matching',ipw:'Inverse probability weighting',mPsm:'Matching',mIpw:'IPW',
+  sub:'Does <b class="pe">preeclampsia</b> raise the risk of <b>ESRD</b>? Confounders: BMI, age',
+  steps:{psm:['Groups','Score','Match','Compare'],ipw:['Groups','Score','Weight','Pseudo-population']},
+  caliper:'Caliper',pairs:(m,u)=>`${m} pairs · ${u} unmatched`,bmi:'BMI',esrd:'ESRD',trueEffect:'True effect',none:'None',x2:'×2 risk',newSample:'New sample',showEsrd:'Show ESRD',
+  meanBmi:'Mean BMI',noPe:'No PE',meanAge:'Mean age',rrEsrd:'Risk ratio · ESRD',all:'All',matched:'Matched',weighted:'Weighted',crude:'Crude',
+  tip:['BMI','Age','PS','Weight','ESRD','yes','no'],prev:'Previous step',next:'Next step',method:'Method',
+  tx:{pe:'Preeclampsia',ctl:'No preeclampsia',axis:'Propensity score = P(preeclampsia | BMI, age)',truth:'TRUE'}},
+ es:{title:'Métodos de puntaje de propensión',psm:'Emparejamiento por puntaje de propensión',ipw:'Ponderación por el inverso de la probabilidad',mPsm:'Emparejamiento',mIpw:'IPW',
+  sub:'¿La <b class="pe">preeclampsia</b> aumenta el riesgo de <b>ERCT</b>? Confusores: IMC, edad',
+  steps:{psm:['Grupos','Puntaje','Emparejar','Comparar'],ipw:['Grupos','Puntaje','Ponderar','Pseudopoblación']},
+  caliper:'Caliper',pairs:(m,u)=>`${m} pares · ${u} sin pareja`,bmi:'IMC',esrd:'ERCT',trueEffect:'Efecto real',none:'Ninguno',x2:'Riesgo ×2',newSample:'Nueva muestra',showEsrd:'Mostrar ERCT',
+  meanBmi:'IMC medio',noPe:'Sin PE',meanAge:'Edad media',rrEsrd:'Riesgo relativo · ERCT',all:'Todas',matched:'Emparejadas',weighted:'Ponderadas',crude:'Crudo',
+  tip:['IMC','Edad','PS','Peso','ERCT','sí','no'],prev:'Paso anterior',next:'Paso siguiente',method:'Método',
+  tx:{pe:'Preeclampsia',ctl:'Sin preeclampsia',axis:'Puntaje de propensión (PS) = P(preeclampsia | IMC, edad)',truth:'REAL'}},
+ pt:{title:'Métodos de score de propensão',psm:'Emparelhamento por score de propensão',ipw:'Ponderação pelo inverso da probabilidade',mPsm:'Emparelhamento',mIpw:'IPW',
+  sub:'A <b class="pe">pré-eclâmpsia</b> aumenta o risco de <b>DRCT</b>? Confundidores: IMC, idade',
+  steps:{psm:['Grupos','Score','Emparelhar','Comparar'],ipw:['Grupos','Score','Ponderar','Pseudo-população']},
+  caliper:'Caliper',pairs:(m,u)=>`${m} pares · ${u} sem par`,bmi:'IMC',esrd:'DRCT',trueEffect:'Efeito real',none:'Nenhum',x2:'Risco ×2',newSample:'Nova amostra',showEsrd:'Mostrar DRCT',
+  meanBmi:'IMC médio',noPe:'Sem PE',meanAge:'Idade média',rrEsrd:'Risco relativo · DRCT',all:'Todas',matched:'Emparelhadas',weighted:'Ponderadas',crude:'Bruto',
+  tip:['IMC','Idade','PS','Peso','DRCT','sim','não'],prev:'Passo anterior',next:'Passo seguinte',method:'Método',
+  tx:{pe:'Pré-eclâmpsia',ctl:'Sem pré-eclâmpsia',axis:'Score de propensão (PS) = P(pré-eclâmpsia | IMC, idade)',truth:'REAL'}}
+};
+function storedLang(){try{return localStorage.getItem('propensity-lang')}catch(e){return null}}
+let lang=[new URLSearchParams(location.search).get('lang'),storedLang()].find(c=>c in I18N)||'en';
+const L10=()=>I18N[lang];
+function setLanguage(code,silent){
+  lang=code;const D=L10();
+  document.documentElement.lang=code;document.title=D.title;TX=D.tx;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const v=D[el.dataset.i18n];if(typeof v==='string')el.textContent=v});
+  $('sub').innerHTML=D.sub;$('m-psm').textContent=D.mPsm;$('m-ipw').textContent=D.mIpw;$('callab').textContent=D.caliper;
+  $('prev').setAttribute('aria-label',D.prev);$('next').setAttribute('aria-label',D.next);
+  document.querySelectorAll('.lang').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lang===code));
+  setMethod(method,true);
+  if(!silent)render(false);
+}
+document.querySelectorAll('.lang').forEach(b=>b.addEventListener('click',()=>{setLanguage(b.dataset.lang);try{localStorage.setItem('propensity-lang',lang)}catch(e){}}));
+
 function match(){
   people.forEach(p=>p.match=null);
   const ctr=people.filter(p=>!p.pe),used=new Set();
@@ -331,7 +381,7 @@ function match(){
 function psmLayout(step){
   match();
   const T=people.filter(p=>p.pe),m=T.filter(p=>p.match).length;
-  $('npairs').textContent=`${m} pairs · ${T.length-m} unmatched`;
+  $('npairs').textContent=L10().pairs(m,T.length-m);
   if(step===0)return layoutGroups();
   const {L}=layoutScore();
   if(step===1)return {L,under:axisSVG(),over:sideLabels()};
@@ -367,33 +417,33 @@ function ipwLayout(step){
   lists.forEach((a,si)=>{const [pe,cx]=sides[si],used=Math.min(cols,a.length),left=cx-(used-1)*cw/2,top=86+h/2;
     a.forEach((it,i)=>L.set(it,{x:left+(i%cols)*cw,y:top+Math.floor(i/cols)*h,s,o:1,delay:it.parent?150+Math.min(700,i*7):0}));
     const g=people.filter(p=>p.pe===pe),nw=g.reduce((t,p)=>t+p.w,0);
-    over+=`<text class="glbl ${pe?'pe':'ctl'}" x="${cx}" y="52" text-anchor="middle">${pe?'Preeclampsia':'No preeclampsia'} <tspan class="gn">n=${g.length} → ${Math.round(nw)}</tspan></text>`});
+    over+=`<text class="glbl ${pe?'pe':'ctl'}" x="${cx}" y="52" text-anchor="middle">${pe?TX.pe:TX.ctl} <tspan class="gn">n=${g.length} → ${Math.round(nw)}</tspan></text>`});
   return {L,over};
 }
 const PAGE={
   cloneCount:p=>Math.max(0,Math.round(p.w)-1),
-  tip:p=>`BMI    ${p.bmi.toFixed(1)}\nAge    ${Math.round(p.age)}\nPS     ${p.ps.toFixed(2)}`+(method==='ipw'?`\nWeight ${p.w.toFixed(1)}`:'')+`\nESRD   ${hasEsrd(p)?'yes':'no'}`,
+  tip:p=>{const t=L10().tip,pad=s=>s.padEnd(7);return `${pad(t[0])}${p.bmi.toFixed(1)}\n${pad(t[1])}${Math.round(p.age)}\n${pad(t[2])}${p.ps.toFixed(2)}`+(method==='ipw'?`\n${pad(t[3])}${p.w.toFixed(1)}`:'')+($('showEsrd').checked?`\n${pad(t[4])}${hasEsrd(p)?t[5]:t[6]}`:'')},
   layout:step=>method==='psm'?psmLayout(step):ipwLayout(step),
   cards(){
-    const T=people.filter(p=>p.pe),C=people.filter(p=>!p.pe),on=S.step>=2;
+    const T=people.filter(p=>p.pe),C=people.filter(p=>!p.pe),on=S.step>=2,D=L10();
     let a2,lab,est;
     if(method==='psm'){
       const MT=T.filter(p=>p.match),MC=MT.map(p=>p.match);
-      a2=f=>[mean(MT,f),mean(MC,f)];lab='Matched';est=mean(MT,riskOf)/mean(MC,riskOf);
+      a2=f=>[mean(MT,f),mean(MC,f)];lab=D.matched;est=mean(MT,riskOf)/mean(MC,riskOf);
     }else{
-      const w=p=>p.w;a2=f=>[wmean(T,f,w),wmean(C,f,w)];lab='Weighted';est=wmean(T,riskOf,w)/wmean(C,riskOf,w);
+      const w=p=>p.w;a2=f=>[wmean(T,f,w),wmean(C,f,w)];lab=D.weighted;est=wmean(T,riskOf,w)/wmean(C,riskOf,w);
     }
     const row=(f,label)=>{const [a,b]=a2(f);return {label,a,b,on}};
-    dumbbell($('c-bmi'),[{label:'All',a:mean(T,p=>p.bmi),b:mean(C,p=>p.bmi),on:true},row(p=>p.bmi,lab)],20,36,[20,24,28,32,36]);
-    dumbbell($('c-age'),[{label:'All',a:mean(T,p=>p.age),b:mean(C,p=>p.age),on:true},row(p=>p.age,lab)],24,36,[24,28,32,36]);
-    rrPlot($('c-rr'),[{label:'Crude',v:mean(T,riskOf)/mean(C,riskOf),on:true},{label:method==='psm'?'Matched':'IPW',v:est,on}],S.rr);
+    dumbbell($('c-bmi'),[{label:D.all,a:mean(T,p=>p.bmi),b:mean(C,p=>p.bmi),on:true},row(p=>p.bmi,lab)],20,36,[20,24,28,32,36]);
+    dumbbell($('c-age'),[{label:D.all,a:mean(T,p=>p.age),b:mean(C,p=>p.age),on:true},row(p=>p.age,lab)],24,36,[24,28,32,36]);
+    rrPlot($('c-rr'),[{label:D.crude,v:mean(T,riskOf)/mean(C,riskOf),on:true},{label:method==='psm'?D.matched:'IPW',v:est,on}],S.rr);
   }
 };
 function setMethod(m,silent){
   method=m;
   $('m-psm').setAttribute('aria-pressed',m==='psm');$('m-ipw').setAttribute('aria-pressed',m==='ipw');
-  $('h1').textContent=m==='psm'?'Propensity score matching':'Inverse probability weighting';
-  document.querySelectorAll('.chip .lab').forEach((el,i)=>el.textContent=LBL[m][i]);
+  $('h1').textContent=L10()[m];
+  document.querySelectorAll('.chip .lab').forEach((el,i)=>el.textContent=L10().steps[m][i]);
   $('calctl').hidden=$('pairctl').hidden=m!=='psm';
   try{history.replaceState(null,'','#'+m)}catch(e){}
   if(!silent)render(true);
@@ -401,7 +451,7 @@ function setMethod(m,silent){
 $('m-psm').addEventListener('click',()=>setMethod('psm'));
 $('m-ipw').addEventListener('click',()=>setMethod('ipw'));
 $('caliper').addEventListener('input',e=>{caliper=+e.target.value;$('calv').textContent=caliper.toFixed(2);render(false)});
-setMethod(method,true);
+setLanguage(lang,true);
 generate();go(0,true);
 </script>
 </body>
