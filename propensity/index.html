@@ -127,7 +127,7 @@ body{margin:0}
     <div class="ctrls">
       <label class="ctl" for="caliper" id="calctl"><span id="callab">Caliper</span> <input type="range" id="caliper" min="0.01" max="0.3" step="0.01" value="0.05"><output id="calv">0.05</output></label>
       <span class="ctl" id="pairctl"><output id="npairs" style="min-width:auto">–</output></span>
-      <span class="ctl"><span data-i18n="trueEffect">True effect</span> <span class="seg" role="group" aria-label="True effect of preeclampsia"><button id="rr1" type="button" aria-pressed="true" data-i18n="none">None</button><button id="rr2" type="button" aria-pressed="false" data-i18n="x2">×2 risk</button></span></span><label class="ctl" for="showEsrd"><input type="checkbox" id="showEsrd" checked> <span data-i18n="showEsrd">Show ESRD</span></label><button class="btn" id="resample" type="button">↻ <span data-i18n="newSample">New sample</span></button>
+      <span class="ctl"><span data-i18n="trueEffect">True effect</span> <span class="seg" role="group" aria-label="True effect of preeclampsia"><button id="rr1" type="button" aria-pressed="false" data-i18n="none">None</button><button id="rr2" type="button" aria-pressed="true" data-i18n="x2">×2 risk</button></span></span><label class="ctl" for="showEsrd"><input type="checkbox" id="showEsrd" checked> <span data-i18n="showEsrd">Show ESRD</span></label><button class="btn" id="resample" type="button">↻ <span data-i18n="newSample">New sample</span></button>
     </div>
   </div>
   <div class="stage"><svg id="stage" viewBox="0 0 960 460" role="img" aria-label="Women with and without preeclampsia, arranged by step"><g id="g-under"></g><g id="g-people"></g><g id="g-over"></g></svg></div>
@@ -140,7 +140,7 @@ const W=960,H=460,X0=70,X1=900,BIN=0.025;
 let AX=210;
 // Text drawn inside the SVGs; pages may replace these for other languages
 let TX={pe:'Preeclampsia',ctl:'No preeclampsia',axis:'Propensity score = P(preeclampsia | BMI, age)',truth:'TRUE'};
-const S={step:0,rr:1,seed:4};
+const S={step:0,rr:2,seed:21};
 let people=[],items=[];
 const $=id=>document.getElementById(id);
 const gUnder=$('g-under'),gPeople=$('g-people'),gOver=$('g-over'),tip=$('tip');
