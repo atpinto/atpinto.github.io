@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Multiple imputation</title>
+<meta name="description" content="Step through multiple imputation on a simulated blood pressure example: impute, add noise, repeat, and pool with Rubin's rules.">
+<link rel="icon" href="../assets/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: lecture stage — step bar on top, one wide animated SVG stage, three live readout cards beneath */
+:root{
+  --bg:#EDF0F4; --surface:#FFFFFF; --ink:#172031; --muted:#5B6576; --faint:#C6CED9; --grid:#E4E8EE;
+  --imp:#D6431B; --obs:#2B67AC; --panel:#F1F4F8;
+  --f-display:"Bricolage Grotesque","Avenir Next",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E131A; --surface:#161D27; --ink:#E6EBF2; --muted:#94A0B1; --faint:#3A4555; --grid:#222B37;
+  --imp:#FF7247; --obs:#6BA6EC; --panel:#1E2733; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E131A; --surface:#161D27; --ink:#E6EBF2; --muted:#94A0B1; --faint:#3A4555; --grid:#222B37;
+  --imp:#FF7247; --obs:#6BA6EC; --panel:#1E2733; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.4}
+[hidden]{display:none!important}
+.wrap{max-width:1200px;margin:0 auto;padding-block:18px 28px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--f-display);font-weight:800;font-size:clamp(1.6rem,3.2vw,2.4rem);letter-spacing:-.015em;margin:0;line-height:1.05;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;font-size:1.02rem}
+.sub b{font-weight:700;color:var(--ink)}
+.hright{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.legend{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:.92rem;font-weight:700}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:13px;height:13px;border-radius:50%;display:inline-block}
+.legend .lo{background:var(--obs)} .legend .li{background:var(--imp)} .legend .lm{border:2.5px solid var(--imp)}
+.bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+.steps{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.chip,.nav,.btn,.seg button{font:700 .95rem var(--f-body);cursor:pointer;color:var(--muted);background:var(--surface);border:1px solid var(--faint)}
+.chip{padding:8px 14px 8px 10px;border-radius:999px;display:flex;gap:8px;align-items:center}
+.chip .n{font:500 .78rem var(--f-mono);width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1px solid currentColor}
+.chip[aria-current="step"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.done{color:var(--ink)}
+.nav{width:40px;height:40px;border-radius:50%;font-size:1.3rem;line-height:1;display:grid;place-items:center}
+.nav:disabled{opacity:.35;cursor:default}
+.ctrls{display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap}
+.ctl{display:flex;gap:8px;align-items:center;font-size:.9rem;color:var(--muted);font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--faint);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:6px 12px;font-size:.88rem;background:transparent}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.btn{padding:7px 14px;border-radius:999px}
+input[type=checkbox]{accent-color:var(--ink);width:16px;height:16px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--obs);outline-offset:2px}
+.languages{display:flex;gap:4px}
+.lang{padding:5px;border:1px solid transparent;border-radius:6px;background:transparent;line-height:0;opacity:.5;cursor:pointer}
+.lang:hover{opacity:1}
+.lang[aria-pressed="true"]{opacity:1;border-color:var(--faint)}
+.lang svg{width:30px;height:20px;border-radius:2px;box-shadow:0 0 0 1px rgba(23,32,49,.18)}
+.stage{background:var(--surface);border-radius:16px;border:1px solid var(--grid);overflow:hidden}
+.stage svg{display:block;width:100%;height:auto}
+.dot circle{stroke:var(--surface);stroke-width:1.2;transition:fill .35s,stroke .35s}
+.dot.obs circle{fill:var(--obs)} .dot.mis circle{fill:var(--imp)}
+.dot.hollow circle{fill:var(--surface);stroke:var(--imp);stroke-width:2.6}
+.enter > *{animation:fadein .5s .55s both}
+@keyframes fadein{from{opacity:0}}
+.grid{stroke:var(--grid);stroke-width:1.2}
+.axis{stroke:var(--faint);stroke-width:2}
+.tick{font:500 13px var(--f-mono);fill:var(--muted)}
+.axt{font:700 15px var(--f-body);fill:var(--muted)}
+.gn{font:500 15px var(--f-mono);fill:var(--muted)}
+.strip{fill:var(--panel)}
+.striplab{font:700 13px var(--f-body);fill:var(--imp);letter-spacing:.03em}
+.fit{stroke:var(--ink);stroke-width:2.6;stroke-linecap:round}
+.fit.dim{opacity:.3}
+.mline{stroke:var(--ink);stroke-width:1.8;stroke-dasharray:7 5}
+.mlab{font:500 15px var(--f-mono);fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
+.ghost{fill:none;stroke:var(--muted);stroke-width:1.6;stroke-dasharray:3 2.5}
+.panel{fill:var(--panel)}
+.pnum{font:500 13px var(--f-mono);fill:var(--muted)}
+.pval{font:500 13px var(--f-mono);fill:var(--ink)}
+.pmean{stroke:var(--ink);stroke-width:1.4;stroke-dasharray:5 4}
+.fl{font:500 14px var(--f-mono);fill:var(--muted)}
+.fv{font:500 14px var(--f-mono);fill:var(--ink)}
+.fci{stroke:var(--faint);stroke-linecap:round}
+.fdot{fill:var(--ink)}
+.pool{font:800 20px var(--f-display);fill:var(--imp)}
+.poolci{stroke:var(--imp);stroke-width:6;stroke-linecap:round}
+.pooldot{fill:var(--imp);stroke:var(--surface);stroke-width:2}
+.poolv{font:500 16px var(--f-mono);fill:var(--ink)}
+.truth{stroke:var(--ink);stroke-dasharray:4 4;stroke-width:1.5}
+.tl{font:700 11px var(--f-body);fill:var(--ink);letter-spacing:.05em}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:780px){.cards{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--grid);border-radius:16px;padding:12px 16px 8px;min-width:0}
+.card h2{font:700 .78rem var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 2px}
+.card svg{width:100%;height:auto;display:block}
+.rl{font:700 12px var(--f-body);fill:var(--muted);letter-spacing:.03em}
+.db{stroke:var(--faint);stroke-width:5;stroke-linecap:round}
+.c-cc{fill:var(--obs)} .c-si{fill:var(--muted)} .c-mi{fill:var(--imp)}
+.val{font:500 13px var(--f-mono);fill:var(--ink)}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font:500 .8rem/1.45 var(--f-mono);padding:6px 10px;border-radius:8px;white-space:pre;z-index:5}
+@media (prefers-reduced-motion:reduce){.enter > *{animation:none}.dot circle{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1 id="h1">Multiple imputation</h1><p class="sub" id="sub"></p></div>
+    <div class="hright">
+      <span class="languages" role="group" aria-label="Language">
+        <button type="button" class="lang" data-lang="en" lang="en" aria-label="English" title="English"><svg viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><clipPath id="uk-cross"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><path d="M0 0h60v30H0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" clip-path="url(#uk-cross)" stroke="#c8102e" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></svg></button>
+        <button type="button" class="lang" data-lang="es" lang="es" aria-label="Español" title="Español"><svg viewBox="0 0 3 2" aria-hidden="true"><path d="M0 0h3v2H0z" fill="#aa151b"/><path d="M0 .5h3v1H0z" fill="#f1bf00"/></svg></button>
+        <button type="button" class="lang" data-lang="pt" lang="pt" aria-label="Português" title="Português"><svg viewBox="0 0 600 400" aria-hidden="true"><path d="M0 0h600v400H0z" fill="#da291c"/><path d="M0 0h240v400H0z" fill="#046a38"/><circle cx="240" cy="200" r="80" fill="none" stroke="#ffe900" stroke-width="18"/><path d="M205 150h70v60a35 35 0 0 1-70 0z" fill="#fff" stroke="#da291c" stroke-width="12"/></svg></button>
+      </span>
+      <div class="legend"><span><i class="lo"></i><span data-i18n="observed">Observed</span></span><span><i class="lm"></i><span data-i18n="missing">Missing</span></span><span><i class="li"></i><span data-i18n="imputed">Imputed</span></span></div>
+    </div>
+  </header>
+  <div class="bar">
+    <nav class="steps" aria-label="Steps">
+      <button class="nav" id="prev" aria-label="Previous step">‹</button>
+      <button class="chip" type="button"><span class="n">1</span><span class="lab"></span></button>
+      <button class="chip" type="button"><span class="n">2</span><span class="lab"></span></button>
+      <button class="chip" type="button"><span class="n">3</span><span class="lab"></span></button>
+      <button class="chip" type="button"><span class="n">4</span><span class="lab"></span></button>
+      <button class="chip" type="button"><span class="n">5</span><span class="lab"></span></button>
+      <button class="nav" id="next" aria-label="Next step">›</button>
+    </nav>
+    <div class="ctrls">
+      <span class="ctl"><span data-i18n="imputations">Imputations</span> <span class="seg" id="mseg" role="group" aria-label="Number of imputations"><button type="button" data-m="3">3</button><button type="button" data-m="5">5</button><button type="button" data-m="10">10</button><button type="button" data-m="20">20</button></span></span>
+      <span class="ctl"><span data-i18n="missingness">Missingness</span> <span class="seg" id="mechseg" role="group" aria-label="Missingness mechanism"><button type="button" data-mech="mcar" data-i18n="mcar">Random</button><button type="button" data-mech="mar" data-i18n="mar">Depends on age</button></span></span>
+      <label class="ctl" for="showTrue"><input type="checkbox" id="showTrue"> <span data-i18n="showTrue">Show true values</span></label>
+      <button class="btn" id="resample" type="button">↻ <span data-i18n="newSample">New sample</span></button>
+    </div>
+  </div>
+  <div class="stage"><svg id="stage" viewBox="0 0 960 460" role="img" aria-label="Scatter plot of systolic blood pressure against age, arranged by step"><g id="g-under"></g><g id="g-dots"></g><g id="g-over"></g></svg></div>
+  <section class="cards">
+    <div class="card"><h2 data-i18n="cMean">Mean systolic BP · 95% CI</h2><svg id="c-est" viewBox="0 0 320 146"></svg></div>
+    <div class="card"><h2 data-i18n="cSe">Standard error</h2><svg id="c-se" viewBox="0 0 320 146"></svg></div>
+    <div class="card"><h2 data-i18n="cVar">Rubin's rules · variance</h2><svg id="c-var" viewBox="0 0 320 146"></svg></div>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+<script>
+const NS="http://www.w3.org/2000/svg";
+const W=960,H=460,PX0=84,PX1=900,PY0=28,PY1=348,STRIP=402;
+const AGE=[30,80],BP=[90,190],N=40,MMAX=20;
+const S={step:0,m:5,mech:'mar',seed:3,showTrue:false};
+let people=[],items=[],draws=[],reps=[],fit={},cc={},single={},full={};
+const $=id=>document.getElementById(id);
+const gUnder=$('g-under'),gDots=$('g-dots'),gOver=$('g-over'),tip=$('tip');
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const expit=z=>1/(1+Math.exp(-z));
+const mean=(a,f)=>a.reduce((s,p)=>s+f(p),0)/a.length;
+const sx=a=>PX0+(a-AGE[0])/(AGE[1]-AGE[0])*(PX1-PX0);
+const sy=b=>PY1-(b-BP[0])/(BP[1]-BP[0])*(PY1-PY0);
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function normal(r){let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r())}
+// 97.5% quantile of Student's t (Cornish–Fisher expansion; df may be fractional)
+function tq(v){const z=1.959964,z3=z**3,z5=z**5,z7=z**7;v=Math.max(v,2);
+  return z+(z3+z)/(4*v)+(5*z5+16*z3+3*z)/(96*v*v)+(3*z7+19*z5+17*z3-15*z)/(384*v**3)}
+// Mean of a completed data set and its usual standard error
+function summary(y,df){const n=y.length,q=y.reduce((s,v)=>s+v,0)/n,v=y.reduce((s,x)=>s+(x-q)**2,0)/(n-1),se=Math.sqrt(v/n),t=tq(df??n-1);
+  return {q,u:v/n,se,lo:q-t*se,hi:q+t*se}}
+// Missingness: completely at random, or more likely in older patients
+const pMiss=(p,mech)=>mech==='mar'?expit(-0.7+0.1*(p.age-55)):0.38;
+
+function generate(){
+  let r;
+  for(let t=0;t<500;t++){
+    r=mulberry32(S.seed*7919+t*31+1);const arr=[];
+    for(let i=0;i<N;i++){const age=30+50*r();arr.push({id:i,age,bp:clamp(96+0.75*age+13*normal(r),94,186),u:r()})}
+    people=arr;
+    if(['mar','mcar'].every(m=>{const k=arr.filter(p=>p.u<pMiss(p,m)).length;return k>=13&&k<=18}))break;
+  }
+  // Fixed random numbers behind each of the 20 possible imputations
+  draws=Array.from({length:MMAX},()=>({chi:Array.from({length:N},()=>normal(r)),zb:[normal(r),normal(r)],e:Array.from({length:N},()=>normal(r))}));
+  full=summary(people.map(p=>p.bp));
+  compute();buildDots();
+}
+function compute(){
+  people.forEach(p=>p.miss=p.u<pMiss(p,S.mech));
+  const obs=people.filter(p=>!p.miss),n=obs.length,mx=mean(obs,p=>p.age),my=mean(obs,p=>p.bp);
+  let sxx=0,sxy=0;obs.forEach(p=>{sxx+=(p.age-mx)**2;sxy+=(p.age-mx)*(p.bp-my)});
+  const b1=sxy/sxx,b0=my-b1*mx;let sse=0;obs.forEach(p=>sse+=(p.bp-b0-b1*p.age)**2);
+  fit={b0,b1,nMiss:N-n};
+  people.forEach(p=>p.hat=b0+b1*p.age);
+  cc=summary(obs.map(p=>p.bp));
+  single=summary(people.map(p=>p.miss?p.hat:p.bp));
+  // Proper imputation from a Bayesian linear regression of BP on age:
+  // draw the residual variance, then the line, then add residual noise
+  reps=draws.map(d=>{
+    let chi=0;for(let i=0;i<n-2;i++)chi+=d.chi[i]**2;
+    const s=Math.sqrt(sse/chi),a=my+s*d.zb[0]/Math.sqrt(n),b=b1+s*d.zb[1]/Math.sqrt(sxx);
+    const y=people.map((p,i)=>p.miss?clamp(a+b*(p.age-mx)+s*d.e[i],92,188):p.bp);
+    return {y,...summary(y)};
+  });
+}
+// Rubin's rules
+function pool(m){
+  const R=reps.slice(0,m),q=mean(R,r=>r.q),w=mean(R,r=>r.u),b=R.reduce((s,r)=>s+(r.q-q)**2,0)/(m-1),bm=(1+1/m)*b,T=w+bm;
+  const df=(m-1)*(1+w/bm)**2,se=Math.sqrt(T),t=tq(df);
+  return {q,w,bm,T,se,lo:q-t*se,hi:q+t*se};
+}
+
+function buildDots(){
+  gDots.innerHTML='';items=[];
+  for(let k=MMAX-1;k>=0;k--)people.forEach(p=>{
+    const g=document.createElementNS(NS,'g');g.innerHTML='<circle r="6.5"/>';
+    const it={p,k,el:g};
+    g.addEventListener('pointerenter',e=>{tip.textContent=tipText(it);tip.hidden=false;moveTip(e)});
+    g.addEventListener('pointermove',moveTip);
+    g.addEventListener('pointerleave',()=>{tip.hidden=true});
+    items.push(it);gDots.appendChild(g);
+  });
+}
+function tipText(it){const t=L10().tip,p=it.p,pad=s=>s.padEnd(6);
+  const v=!p.miss?Math.round(p.bp):S.step===0?t[2]:Math.round(S.step===1?p.hat:reps[it.k].y[p.id])+' ('+t[3]+')';
+  return `${pad(t[0])}${Math.round(p.age)}\n${pad(t[1])}${v}`}
+function moveTip(e){tip.style.left=Math.min(innerWidth-190,e.clientX+16)+'px';tip.style.top=(e.clientY+16)+'px'}
+
+// Positions are tweened in JS and written to the SVG transform attribute
+const DUR=900,FADE=550,reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let raf=0;
+const ease=k=>k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+function drawItem(it){const c=it.cur;
+  it.el.setAttribute('transform',`translate(${c.x.toFixed(2)} ${c.y.toFixed(2)}) scale(${c.s.toFixed(3)})`);
+  it.el.setAttribute('opacity',c.o.toFixed(3))}
+function applyLayout(L,instant){
+  const now=performance.now();
+  items.forEach(it=>{
+    const q=L.get(it),to={x:q.x,y:q.y,s:q.s,o:q.o};
+    if(instant||reduceMotion||!it.cur){it.cur={...to};it.from={...to};it.to=to;it.t0=now;it.live=false;drawItem(it)}
+    else{it.from={...it.cur};it.to=to;it.t0=now;it.live=true}
+    it.el.style.pointerEvents=q.o<.05?'none':'';
+  });
+  if(!raf)raf=requestAnimationFrame(tick);
+}
+function tick(now){
+  let busy=false;
+  items.forEach(it=>{
+    if(!it.live)return;
+    const k=clamp((now-it.t0)/DUR,0,1),ko=clamp((now-it.t0)/FADE,0,1),e=ease(k),f=it.from,t=it.to;
+    if(k<1)busy=true;else it.live=false;
+    it.cur={x:f.x+(t.x-f.x)*e,y:f.y+(t.y-f.y)*e,s:f.s+(t.s-f.s)*e,o:f.o+(t.o-f.o)*ko};
+    drawItem(it);
+  });
+  raf=busy?requestAnimationFrame(tick):0;
+}
+
+let TX={};
+const f1=v=>v.toFixed(1);
+function plotFrame(step){
+  let s='';
+  [100,120,140,160,180].forEach(v=>{s+=`<line class="grid" x1="${PX0}" x2="${PX1}" y1="${sy(v)}" y2="${sy(v)}"/><text class="tick" x="${PX0-12}" y="${sy(v)+4.5}" text-anchor="end">${v}</text>`});
+  [30,40,50,60,70,80].forEach(v=>{s+=`<text class="tick" x="${sx(v)}" y="${PY1+21}" text-anchor="middle">${v}</text>`});
+  if(step===0)s+=`<rect class="strip" x="${PX0}" y="${STRIP-17}" width="${PX1-PX0}" height="34" rx="10"/><text class="striplab" x="${PX0-12}" y="${STRIP-2}" text-anchor="end">${TX.strip[0]}</text><text class="striplab" x="${PX0-12}" y="${STRIP+13}" text-anchor="end">${TX.strip[1]}</text>`;
+  s+=`<line class="axis" x1="${PX0}" x2="${PX1}" y1="${PY1}" y2="${PY1}"/>`;
+  s+=`<text class="axt" x="${(PX0+PX1)/2}" y="${H-10}" text-anchor="middle">${TX.age}</text>`;
+  s+=`<text class="axt" transform="translate(22 ${(PY0+PY1)/2}) rotate(-90)" text-anchor="middle">${TX.bp}</text>`;
+  return s;
+}
+function meanLine(q){const y=sy(q);
+  return `<line class="mline" x1="${PX0}" x2="${PX1}" y1="${y}" y2="${y}"/><text class="mlab" x="${PX1-8}" y="${y-8}" text-anchor="end">${TX.mean} ${f1(q)}</text>`}
+function panelGeom(){
+  const m=S.m,cols={3:3,5:5,10:5,20:7}[m],rows=Math.ceil(m/cols),gap=14,ax0=30,aw=W-60;
+  const pw=(aw-(cols-1)*gap)/cols,ph=Math.min((H-40-(rows-1)*gap)/rows,pw*1.7,300);
+  const top=(H-rows*ph-(rows-1)*gap)/2,pad=Math.max(8,pw*.06),ptop=30;
+  return Array.from({length:m},(_,k)=>{
+    const n=Math.min(cols,m-Math.floor(k/cols)*cols),off=(cols-n)*(pw+gap)/2; // centre a short last row
+    const x0=ax0+off+(k%cols)*(pw+gap),y0=top+Math.floor(k/cols)*(ph+gap);
+    return {x0,y0,pw,ph,s:clamp(pw/400,.3,.72),
+      x:a=>x0+pad+(a-AGE[0])/(AGE[1]-AGE[0])*(pw-2*pad),
+      y:b=>y0+ph-pad-(b-BP[0])/(BP[1]-BP[0])*(ph-ptop-pad)};
+  });
+}
+function forest(){
+  const m=S.m,P=pool(m),R=reps.slice(0,m);
+  const lo=Math.floor((Math.min(P.lo,full.q,...R.map(r=>r.lo))-1)/5)*5,hi=Math.ceil((Math.max(P.hi,full.q,...R.map(r=>r.hi))+1)/5)*5;
+  const xa=170,xb=720,fx=v=>xa+(v-lo)/(hi-lo)*(xb-xa);
+  const rh=Math.min(36,(H-128)/(m+1.8)),top=(H-58-(m+1.8)*rh)/2+rh/2+8,bot=top+(m+1.3)*rh;
+  let s='';
+  for(let v=lo;v<=hi;v+=5)s+=`<line class="grid" x1="${fx(v)}" x2="${fx(v)}" y1="${top-rh/2}" y2="${bot}"/><text class="tick" x="${fx(v)}" y="${bot+19}" text-anchor="middle">${v}</text>`;
+  s+=`<text class="axt" x="${(xa+xb)/2}" y="${bot+42}" text-anchor="middle">${TX.meanBp}</text>`;
+  s+=`<line class="truth" x1="${fx(full.q)}" x2="${fx(full.q)}" y1="${top-rh/2-4}" y2="${bot}"/><text class="tl" x="${fx(full.q)+6}" y="${top-rh/2+2}">${TX.full}</text>`;
+  const fs=rh<20?12:14;
+  R.forEach((r,k)=>{const y=top+k*rh;
+    s+=`<text class="fl" style="font-size:${fs}px" x="${xa-22}" y="${y+fs*.35}" text-anchor="end">#${k+1}</text><line class="fci" stroke-width="${rh<20?3:4}" x1="${fx(r.lo)}" x2="${fx(r.hi)}" y1="${y}" y2="${y}"/><circle class="fdot" cx="${fx(r.q)}" cy="${y}" r="${clamp(rh*.2,3,6)}"/><text class="fv" style="font-size:${fs}px" x="${xb+24}" y="${y+fs*.35}">${f1(r.q)}</text>`});
+  const y=top+(m+.6)*rh;
+  s+=`<line class="axis" x1="${xa-90}" x2="${xb+190}" y1="${y-rh*.8}" y2="${y-rh*.8}" style="stroke-width:1.2"/>`;
+  s+=`<text class="pool" x="${xa-22}" y="${y+7}" text-anchor="end">${TX.pooled}</text><line class="poolci" x1="${fx(P.lo)}" x2="${fx(P.hi)}" y1="${y}" y2="${y}"/><circle class="pooldot" cx="${fx(P.q)}" cy="${y}" r="9"/><text class="poolv" x="${xb+24}" y="${y+6}">${f1(P.q)} (${f1(P.lo)}–${f1(P.hi)})</text>`;
+  return s;
+}
+function layout(step){
+  const L=new Map();let under='',over='';
+  const main=(it,st,o)=>{const p=it.p,y=!p.miss?sy(p.bp):st===0?STRIP:st===1?sy(p.hat):sy(reps[0].y[p.id]);return {x:sx(p.age),y,s:1,o}};
+  if(step<=2){
+    items.forEach(it=>L.set(it,main(it,step,it.k===0?1:0)));
+    under=plotFrame(step);
+    if(step>=1)under+=`<line class="fit${step===2?' dim':''}" x1="${sx(AGE[0])}" y1="${sy(fit.b0+fit.b1*AGE[0])}" x2="${sx(AGE[1])}" y2="${sy(fit.b0+fit.b1*AGE[1])}"/>`;
+    over+=meanLine([cc.q,single.q,reps[0].q][step]);
+    over+=`<text class="gn" x="${PX0+14}" y="${PY0+18}">n = ${N} · ${TX.nMiss(fit.nMiss)}</text>`;
+    if(S.showTrue)people.forEach(p=>{if(p.miss)over+=`<circle class="ghost" cx="${sx(p.age)}" cy="${sy(p.bp)}" r="6.5"/>`});
+  }else{
+    const G=panelGeom();
+    items.forEach(it=>{const g=G[it.k];
+      L.set(it,g?{x:g.x(it.p.age),y:g.y(reps[it.k].y[it.p.id]),s:g.s,o:step===3?1:0}:main(it,2,0))});
+    if(step===3)G.forEach((g,k)=>{const y=g.y(reps[k].q);
+      under+=`<rect class="panel" x="${g.x0}" y="${g.y0}" width="${g.pw}" height="${g.ph}" rx="10"/><text class="pnum" x="${g.x0+10}" y="${g.y0+19}">#${k+1}</text><text class="pval" x="${g.x0+g.pw-10}" y="${g.y0+19}" text-anchor="end">${f1(reps[k].q)}</text>`;
+      over+=`<line class="pmean" x1="${g.x0+6}" x2="${g.x0+g.pw-6}" y1="${y}" y2="${y}"/>`});
+    else under=forest();
+  }
+  return {L,under,over};
+}
+
+// Readout cards
+const ROWY=[30,66,102];
+function rowsFor(){const D=L10(),P=pool(S.m);
+  return [{label:D.rCc,cls:'c-cc',on:true,...cc},{label:D.rSi,cls:'c-si',on:S.step>=1,...single},{label:D.rMi,cls:'c-mi',on:S.step>=4,...P}]}
+function estCard(el,rows){
+  const c=Math.round(full.q/5)*5,lo=c-15,hi=c+15,xa=128,xb=268,x=v=>xa+(clamp(v,lo,hi)-lo)/(hi-lo)*(xb-xa);let s='';
+  [c-10,c,c+10].forEach(t=>{s+=`<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="14" y2="120"/><text class="tick" x="${x(t)}" y="140" text-anchor="middle">${t}</text>`});
+  s+=`<line class="truth" x1="${x(full.q)}" x2="${x(full.q)}" y1="12" y2="122"/><text class="tl" x="${x(full.q)+5}" y="12">${TX.full}</text>`;
+  rows.forEach((r,i)=>{const y=ROWY[i];
+    s+=`<g opacity="${r.on?1:.15}"><text class="rl" x="0" y="${y+4}">${r.label}</text><line class="db" x1="${x(r.lo)}" x2="${x(r.hi)}" y1="${y}" y2="${y}"/><circle class="${r.cls}" cx="${x(r.q)}" cy="${y}" r="7"/><text class="val" x="320" y="${y+4}" text-anchor="end">${f1(r.q)}</text></g>`});
+  el.innerHTML=s;
+}
+function seCard(el,rows){
+  const hi=5,xa=128,xb=268,x=v=>xa+clamp(v,0,hi)/hi*(xb-xa);let s='';
+  [0,2,4].forEach(t=>{s+=`<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="14" y2="120"/><text class="tick" x="${x(t)}" y="140" text-anchor="middle">${t}</text>`});
+  rows.forEach((r,i)=>{const y=ROWY[i];
+    s+=`<g opacity="${r.on?1:.15}"><text class="rl" x="0" y="${y+4}">${r.label}</text><rect class="${r.cls}" x="${xa}" y="${y-8}" width="${x(r.se)-xa}" height="16" rx="4"/><text class="val" x="320" y="${y+4}" text-anchor="end">${r.se.toFixed(2)}</text></g>`});
+  el.innerHTML=s;
+}
+function varCard(el){
+  const D=L10(),P=pool(S.m),ww=320*P.w/P.T;
+  el.innerHTML=`<g opacity="${S.step>=4?1:.15}"><rect class="c-cc" x="0" y="14" width="${ww-2}" height="22" rx="5"/><rect class="c-mi" x="${ww+2}" y="14" width="${320-ww-2}" height="22" rx="5"/>`+
+    [[D.vW,'c-cc',P.w.toFixed(2)],[D.vB,'c-mi',P.bm.toFixed(2)],[D.vT,'',`${P.T.toFixed(2)} → SE ${P.se.toFixed(2)}`]].map(([l,c,v],i)=>{const y=68+i*26;
+      return (c?`<circle class="${c}" cx="6" cy="${y-4}" r="5.5"/>`:'')+`<text class="rl" x="${c?18:0}" y="${y}">${l}</text><text class="val" x="320" y="${y}" text-anchor="end">${v}</text>`}).join('')+'</g>';
+}
+function cards(){const r=rowsFor();estCard($('c-est'),r);seCard($('c-se'),r);varCard($('c-var'))}
+
+// Navigation and controls
+const chips=[...document.querySelectorAll('.chip')];
+function render(stepChanged,instant){
+  items.forEach(it=>it.el.setAttribute('class','dot '+(it.p.miss?'mis':'obs')+(it.p.miss&&S.step===0?' hollow':'')));
+  const r=layout(S.step);
+  applyLayout(r.L,instant);
+  [gUnder,gOver].forEach(g=>g.classList.toggle('enter',!!stepChanged&&!instant));
+  gUnder.innerHTML=r.under;gOver.innerHTML=r.over;
+  cards();
+}
+function go(step,instant){
+  S.step=clamp(step,0,chips.length-1);
+  chips.forEach((c,i)=>{c.toggleAttribute('aria-current',false);if(i===S.step)c.setAttribute('aria-current','step');c.classList.toggle('done',i<S.step)});
+  $('prev').disabled=S.step===0;$('next').disabled=S.step===chips.length-1;
+  render(true,instant);
+}
+chips.forEach((c,i)=>c.addEventListener('click',()=>go(i)));
+$('prev').addEventListener('click',()=>go(S.step-1));
+$('next').addEventListener('click',()=>go(S.step+1));
+document.addEventListener('keydown',e=>{
+  if(['ArrowRight','PageDown'].includes(e.key)){e.preventDefault();go(S.step+1)}
+  if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();go(S.step-1)}
+});
+function syncSegs(){
+  document.querySelectorAll('#mseg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.m===S.m));
+  document.querySelectorAll('#mechseg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mech===S.mech));
+}
+$('mseg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.m=+b.dataset.m;syncSegs();render(false)});
+$('mechseg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.mech=b.dataset.mech;syncSegs();compute();render(false)});
+$('showTrue').addEventListener('change',e=>{S.showTrue=e.target.checked;render(false)});
+$('resample').addEventListener('click',()=>{S.seed++;generate();render(true,true)});
+
+const I18N={
+ en:{title:'Multiple imputation',sub:'What is the mean <b>systolic blood pressure</b> of 40 patients, when some were never measured?',
+  steps:['Missing','Impute','Add noise','Repeat','Pool'],observed:'Observed',missing:'Missing',imputed:'Imputed',
+  imputations:'Imputations',missingness:'Missingness',mcar:'Random',mar:'Depends on age',showTrue:'Show true values',newSample:'New sample',
+  cMean:'Mean systolic BP · 95% CI',cSe:'Standard error',cVar:'Rubin’s rules · variance',
+  rCc:'Complete cases',rSi:'Single imputation',rMi:'Multiple imputation',vW:'Within imputations',vB:'Between imputations × (1 + 1/m)',vT:'Total',
+  tip:['Age','SBP','missing','imputed'],prev:'Previous step',next:'Next step',
+  tx:{age:'Age (years)',bp:'Systolic BP (mmHg)',meanBp:'Mean systolic BP (mmHg)',mean:'mean',full:'FULL DATA',pooled:'Pooled',strip:['BP not','measured'],nMiss:k=>`${k} missing`}},
+ es:{title:'Imputación múltiple',sub:'¿Cuál es la <b>presión arterial sistólica</b> media de 40 pacientes, si a algunos nunca se les midió?',
+  steps:['Faltantes','Imputar','Añadir ruido','Repetir','Combinar'],observed:'Observado',missing:'Faltante',imputed:'Imputado',
+  imputations:'Imputaciones',missingness:'Datos faltantes',mcar:'Al azar',mar:'Depende de la edad',showTrue:'Mostrar valores reales',newSample:'Nueva muestra',
+  cMean:'PA sistólica media · IC 95%',cSe:'Error estándar',cVar:'Reglas de Rubin · varianza',
+  rCc:'Casos completos',rSi:'Imputación única',rMi:'Imputación múltiple',vW:'Dentro de las imputaciones',vB:'Entre imputaciones × (1 + 1/m)',vT:'Total',
+  tip:['Edad','PAS','faltante','imputado'],prev:'Paso anterior',next:'Paso siguiente',
+  tx:{age:'Edad (años)',bp:'PA sistólica (mmHg)',meanBp:'PA sistólica media (mmHg)',mean:'media',full:'DATOS COMPLETOS',pooled:'Combinado',strip:['PA no','medida'],nMiss:k=>`${k} faltantes`}},
+ pt:{title:'Imputação múltipla',sub:'Qual é a <b>pressão arterial sistólica</b> média de 40 doentes, se alguns nunca foram medidos?',
+  steps:['Em falta','Imputar','Adicionar ruído','Repetir','Combinar'],observed:'Observado',missing:'Em falta',imputed:'Imputado',
+  imputations:'Imputações',missingness:'Dados em falta',mcar:'Ao acaso',mar:'Depende da idade',showTrue:'Mostrar valores reais',newSample:'Nova amostra',
+  cMean:'PA sistólica média · IC 95%',cSe:'Erro padrão',cVar:'Regras de Rubin · variância',
+  rCc:'Casos completos',rSi:'Imputação única',rMi:'Imputação múltipla',vW:'Dentro das imputações',vB:'Entre imputações × (1 + 1/m)',vT:'Total',
+  tip:['Idade','PAS','em falta','imputado'],prev:'Passo anterior',next:'Passo seguinte',
+  tx:{age:'Idade (anos)',bp:'PA sistólica (mmHg)',meanBp:'PA sistólica média (mmHg)',mean:'média',full:'DADOS COMPLETOS',pooled:'Combinado',strip:['PA não','medida'],nMiss:k=>`${k} em falta`}}
+};
+function storedLang(){try{return localStorage.getItem('mi-lang')}catch(e){return null}}
+let lang=[new URLSearchParams(location.search).get('lang'),storedLang()].find(c=>c in I18N)||'en';
+const L10=()=>I18N[lang];
+function setLanguage(code,silent){
+  lang=code;const D=L10();
+  document.documentElement.lang=code;document.title=D.title;TX=D.tx;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const v=D[el.dataset.i18n];if(typeof v==='string')el.textContent=v});
+  $('h1').textContent=D.title;$('sub').innerHTML=D.sub;
+  document.querySelectorAll('.chip .lab').forEach((el,i)=>el.textContent=D.steps[i]);
+  $('prev').setAttribute('aria-label',D.prev);$('next').setAttribute('aria-label',D.next);
+  document.querySelectorAll('.lang').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lang===code));
+  if(!silent)render(false);
+}
+document.querySelectorAll('.lang').forEach(b=>b.addEventListener('click',()=>{setLanguage(b.dataset.lang);try{localStorage.setItem('mi-lang',lang)}catch(e){}}));
+setLanguage(lang,true);syncSegs();
+generate();go(0,true);
+</script>
+</body>
+</html>

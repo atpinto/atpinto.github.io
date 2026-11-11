@@ -687,13 +687,45 @@
     };
   }
 
+  function makeMi() {
+    const rand = mulberry32(11);
+    const pts = Array.from({ length: 30 }, function () {
+      const u = rand();
+      return { u: u, v: 0.2 + 0.5 * u + 0.11 * randn(rand), miss: rand() < 0.12 + 0.5 * u, from: 0, to: 0 };
+    });
+    let t = 0, round = -1;
+    return {
+      reset: function () { t = 0; round = -1; },
+      tick: function (dt, intensity) { t += dt * 0.7 * intensity; },
+      draw: function (ctx, p, w, h) {
+        clear(ctx, p, w, h);
+        const r = Math.floor(t), k = Math.min(1, (t - r) * 2.2), ease = 0.5 - 0.5 * Math.cos(k * Math.PI);
+        if (r !== round) {
+          round = r;
+          pts.forEach(function (d) { if (d.miss) { d.from = d.to; d.to = 0.2 + 0.5 * d.u + 0.11 * randn(rand); } });
+        }
+        const x = function (u) { return 20 + u * (w - 40); }, y = function (v) { return h - 16 - v * (h - 32); };
+        let sum = 0;
+        pts.forEach(function (d) { d.y = d.miss ? d.from + (d.to - d.from) * ease : d.v; sum += d.y; });
+        ctx.strokeStyle = p.rule; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x(0), y(0)); ctx.lineTo(x(1), y(0)); ctx.stroke();
+        ctx.strokeStyle = p.ink; ctx.lineWidth = 1.4; ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(x(0), y(sum / pts.length)); ctx.lineTo(x(1), y(sum / pts.length)); ctx.stroke(); ctx.setLineDash([]);
+        pts.forEach(function (d) {
+          ctx.fillStyle = hexAlpha(d.miss ? p.sample : p.model, 0.9);
+          ctx.beginPath(); ctx.arc(x(d.u), y(d.y), 3.4, 0, Math.PI * 2); ctx.fill();
+        });
+      },
+    };
+  }
+
   const factories = {
     competing: makeCompeting,
     hazard: makeHazard,
     nn: makeNN, mcmc: makeMh("card"), nlin: makeNlin, corr: makeCorr, contbin: makeContBin,
     dummy: makeDummy, rand: makeRand, power: makePower, clt: makeClt, galton: makeGalton,
     monty: makeMonty, ht: makeHt, roc: makeRoc, km: makeKm, km2: makeKm, lmm: makeLmm,
-    propensity: makePropensity,
+    propensity: makePropensity, mi: makeMi,
   };
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
